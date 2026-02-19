@@ -1,31 +1,46 @@
-import { MongoClient } from 'mongodb'
+export async function onRequest(ctx) {
+    const { request, env } = ctx;
 
-const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
+    const headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Typ": "application/json"
+    };
 
-export default async function handler(request, response) {
-    response.setHeader('Access-Control-Allow-Origin', '*');
-
-    if (request.method !== 'GET') {
-        return response.status(405).json({ message: 'Method unsupported except GET.' });
+    if (request.method === "OPTIONS") {
+        return new Response(null, {
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            }
+        });
     }
 
-    try {
-        await client.connect();
+    if (request.method === "GET") {
+        try {
+            const url = new URL(request.url);
+            const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 50);
+            const offset = parseInt(url.searchParams.get("offset") || '0');
 
-        const db = client.db('YQBBQMain');
-        var messages = db.collection('Messages');
+            const { results } = await env.DB.prepare(
+                "select * from Messages order by created_at desc limit ? offset ?"
+            )
+            .bind(limit, offset)
+            .all();
 
-        const res = await messages
-            .find({})
-            .sort({ time: -1 })
-            .limit(50)
-            .toArray();
-        
-        response.status(200).json(res);
-    } catch (error) {
-        return response.status(500).json({ message: "Server internal error.", error: error.message });
-    } finally {
-        await client.close();
+            const total = await env.DB.prepare("select count(*) as count from Messages").first();
+
+            return new Response(JSON.stringify({
+                messages: results,
+                hasMore = offset + results.length < total.count
+            }), { headers });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: "Failed to get messages.", details: error.messages }), {
+                status: 500,
+                headers
+            });
+        }
     }
+
+    return new Response("Method not allowed", { status: 405 });
 }
