@@ -1,0 +1,11 @@
+name = "yqbbq"
+main = "src/index.ts"
+compatibility_date = "2026-02-20"
+
+[site]
+bucket = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yqbbq"
+database_id = "477662f6-0c6d-470d-be9c-3b063ecbb14d"
