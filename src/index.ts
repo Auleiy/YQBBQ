@@ -48,7 +48,7 @@ export default {
                 }
                 return new Response(JSON.stringify({
                     error: "Internal Server Error",
-                    message: err.message
+                    message: `${err.code}: ${err.message}`
                 }), {
                     status: 500,
                     headers: {
