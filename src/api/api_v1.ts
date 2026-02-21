@@ -9,26 +9,35 @@ const respHeadersPlaintext = {
 
 export default {
     async messages(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
-        const utoken = params.get("utoken");
-        console.log(utoken)
+        const rawBody = await request.json();
 
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
+
+        console.log(rawBody);
         switch (request.method) {
-            case "GET":
+            case "POST":
                 try {
-                    const limit = Math.min(parseInt(params.get("limit") || "20"), 60);
-                    const offset = parseInt(params.get("offset") || '0');
+                    const body = rawBody as {
+                        limit: number,
+                        offset: number
+                    };
+
+                    const limit = Math.min(body.limit || 20, 60);
+                    const offset = body.offset || 0;
 
                     var { results } = await env.DB.prepare(
                         "select * from Messages order by created_at desc limit ? offset ?"
                     )
                     .bind(limit, offset)
                     .all();
-
-                    if (utoken) {
-                        results = results.map(element => ({...element, current_user_liked: false}));
-                    }
 
                     const { count } = await env.DB.prepare("select count(*) as count from Messages").first() as { count: number };
 
@@ -49,9 +58,15 @@ export default {
                     });
                 }
             
-            case "POST":
+            case "PATCH":
                 try {
-                    const content = params.get("content");
+                    const body = rawBody as {
+                        content: string,
+                        utoken: string,
+                        anonymous: boolean
+                    };
+
+                    const content = body.content;
                     if (!content) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -62,7 +77,11 @@ export default {
                         });
                     }
 
-                    const user = params.get("user") || "ANONYMOUS";
+                    let user = "ANONYMOUS";
+
+                    if (!body.anonymous) {
+                        user = body.utoken || "ANONYMOUS";
+                    }
 
                     await env.DB.prepare("insert into Messages (content, user) values (?, ?)")
                         .bind(content, user)
@@ -103,21 +122,34 @@ export default {
                         status: 405,
                         headers : {
                             ...respHeaders,
-                            "Allow": "GET, POST, DELETE"
+                            "Allow": "POST, PATCH, DELETE"
                         }
                     });
         }
     },
 
     async like_count(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
-            case "GET":
+            case "POST":
                 try {
-                    const id = parseInt(params.get("id") || "-1");
-                    if (id === -1) {
+                    const body = rawBody as {
+                        id: number
+                    };
+
+                    const id = body.id;
+                    if (!id) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
                             message: "id is missing."
@@ -167,20 +199,35 @@ export default {
                         status: 405,
                         headers : {
                             ...respHeaders,
-                            "Allow": "GET"
+                            "Allow": "POST"
                         }
                     });
         }
     },
 
     async user_liked_messages(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
-            case "GET":
+            case "POST":
                 try {
-                    const utoken = params.get("utoken");
+                    const body = rawBody as {
+                        utoken: string,
+                        msgidMin: number
+                        msgidMax: number
+                    };
+
+                    const utoken = body.utoken;
                     if (!utoken) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -191,8 +238,8 @@ export default {
                         });
                     }
 
-                    const msgid_min = parseInt(params.get("message_id_min") || "0");
-                    const msgid_max = parseInt(params.get("message_id_max") || "20");
+                    const msgid_min = body.msgidMin || 0;
+                    const msgid_max = body.msgidMax || 20;
 
                     const likedMsgs = (await env.DB.prepare(
                         "select message_id from Likes where user_id = ? and message_id between ? and ?"
@@ -234,22 +281,35 @@ export default {
                         status: 405,
                         headers : {
                             ...respHeaders,
-                            "Allow": "GET"
+                            "Allow": "POST"
                         }
                     });
         }
     },
 
     async like(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
             case "PATCH":
                 try {
-                    const id = parseInt(params.get("id") || "-1");
+                    const body = rawBody as {
+                        id: number,
+                        utoken: string
+                    };
 
-                    if (id === -1) {
+                    const id = body.id;
+                    if (!id) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
                             message: "id is missing."
@@ -259,8 +319,7 @@ export default {
                         });
                     }
 
-                    const utoken = params.get("utoken");
-
+                    const utoken = body.utoken;
                     if (!utoken) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -307,15 +366,28 @@ export default {
     },
 
     async unlike(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
             case "PATCH":
                 try {
-                    const id = parseInt(params.get("id") || "-1");
+                    const body = rawBody as {
+                        id: number,
+                        utoken: string
+                    };
 
-                    if (id === -1) {
+                    const id = body.id;
+                    if (!id) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
                             message: "id is missing."
@@ -325,8 +397,7 @@ export default {
                         });
                     }
 
-                    const utoken = params.get("utoken");
-
+                    const utoken = body.utoken;
                     if (!utoken) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -373,18 +444,40 @@ export default {
     },
 
     async username(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
         
         switch (request.method) {
-            case "GET":
+            case "POST":
                 try {
-                    const id = params.get("id");
+                    const body = rawBody as {
+                        utoken: number,
+                    };
+
+                    const utoken = body.utoken;
+                    if (!utoken) {
+                        return new Response(JSON.stringify({
+                            error: "Bad Request",
+                            message: "utoken is missing."
+                        }), {
+                            status: 400,
+                            headers : respHeaders
+                        });
+                    }
 
                     const { name } = await env.DB.prepare(
                         "select name from Users where id = ?"
                     )
-                    .bind(id)
+                    .bind(utoken)
                     .first() as { name: string };
 
                     if (!name) {
@@ -421,20 +514,34 @@ export default {
                         status: 405,
                         headers: {
                             ...respHeaders,
-                            "Allow": "GET"
+                            "Allow": "POST"
                         }
                     });
         }
     },
 
     async login(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
-            case "GET":
+            case "POST":
                 try {
-                    const inputUsername = params.get("username");
+                    const body = rawBody as {
+                        username: string,
+                        password: string
+                    }
+
+                    const inputUsername = body.username;
                     if (!inputUsername) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -445,7 +552,7 @@ export default {
                         });
                     }
 
-                    const inputPassword = params.get("password");
+                    const inputPassword = body.password;
                     if (!inputPassword) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -503,20 +610,34 @@ export default {
                         status: 405,
                         headers : {
                             ...respHeaders,
-                            "Allow": "GET"
+                            "Allow": "POST"
                         }
                     });
         }
     },
 
     async register(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        const url = new URL(request.url);
-        const params = url.searchParams;
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return new Response(JSON.stringify({
+                error: "Bad Request",
+                message: "body is null."
+            }), {
+                status: 400,
+                headers: respHeaders
+            });
+        }
 
         switch (request.method) {
-            case "POST":
+            case "PATCH":
                 try {
-                    const inputUsername = params.get("username");
+                    const body = rawBody as {
+                        username: string,
+                        password: string
+                    }
+
+                    const inputUsername = body.username;
                     if (!inputUsername) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -541,7 +662,7 @@ export default {
                         });
                     }
 
-                    const inputPassword = params.get("password");
+                    const inputPassword = body.password;
                     if (!inputPassword) {
                         return new Response(JSON.stringify({
                             error: "Bad Request",
@@ -586,7 +707,7 @@ export default {
                         status: 405,
                         headers : {
                             ...respHeaders,
-                            "Allow": "POST"
+                            "Allow": "PATCH"
                         }
                     });
         }

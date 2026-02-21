@@ -6,15 +6,6 @@ const apiVersions: Record<string, any> = {
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        try {
-            const staticResponse = await env.ASSETS.fetch(request);
-
-            if (staticResponse.status !== 404){
-                return staticResponse;
-            }
-        }
-        catch { }
-
         const url = new URL(request.url);
         const path = url.pathname;
 
@@ -69,7 +60,16 @@ export default {
             }
         }
 
-        return new Response("Not Found", {
+        try {
+            const staticResponse = await env.ASSETS.fetch(request);
+
+            if (staticResponse.ok){
+                return staticResponse;
+            }
+        }
+        catch { }
+
+        return new Response("What do you wan't to get???", {
             status: 404,
             headers: {
                 "Content-Type": "plaintext",

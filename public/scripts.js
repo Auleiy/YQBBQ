@@ -37,10 +37,14 @@ function like(element) {
         return;
     }
 
-    fetch(`/api/v1/like?id=${getMessage(element).dataset.id}&utoken=${utoken}`, {
-        method: "PATCH"
+    fetch("/api/v1/like", {
+        method: "PATCH",
+        body: JSON.stringify({
+            id: getMessage(element).dataset.id,
+            utoken
+        })
     });
-    const count = element.querySelector('[name=like-count]');
+    const count = element.querySelector("[name=like-count]");
     count.textContent = parseInt(count.textContent) + 1;
     like_nodata(element);
 }
@@ -52,8 +56,8 @@ function like_nodata(element) {
     }
 
     element.dataset.liked = "true";
-    element.querySelector('[name=like-icon]').classList.remove('nf-cod-heart');
-    element.querySelector('[name=like-icon]').classList.add('nf-cod-heart_filled');
+    element.querySelector("[name=like-icon]").classList.remove("nf-cod-heart");
+    element.querySelector("[name=like-icon]").classList.add("nf-cod-heart_filled");
 }
 
 function unlike(element) {
@@ -62,15 +66,19 @@ function unlike(element) {
         return;
     }
 
-    fetch(`/api/v1/unlike?id=${getMessage(element).dataset.id}&utoken=${utoken}`, {
-        method: "PATCH"
+    fetch("/api/v1/unlike", {
+        method: "PATCH",
+        body: JSON.stringify({
+            id: getMessage(element).dataset.id,
+            utoken
+        })
     });
 
     element.dataset.liked = "false";
-    const count = element.querySelector('[name=like-count]');
+    const count = element.querySelector("[name=like-count]");
     count.textContent = parseInt(count.textContent) - 1;
-    element.querySelector('[name=like-icon]').classList.remove('nf-cod-heart_filled');
-    element.querySelector('[name=like-icon]').classList.add('nf-cod-heart');
+    element.querySelector("[name=like-icon]").classList.remove("nf-cod-heart_filled");
+    element.querySelector("[name=like-icon]").classList.add("nf-cod-heart");
 }
 
 function publish() {
@@ -87,15 +95,14 @@ function publish() {
 
     const anonymous = document.getElementById("anonymous").checked;
     
-    if (anonymous) {
-        fetch(`/api/v1/messages?user=ANONYMOUS&content=${content}`, {
-            method: "POST"
-        });
-    } else {
-        fetch(`/api/v1/messages?user=${utoken}&content=${content}`, {
-            method: "POST"
-        });
-    }
+    fetch("/api/v1/messages", {
+        method: "PATCH",
+        body: JSON.stringify({
+            utoken,
+            content,
+            anonymous
+        })
+    });
 
     document.getElementById("content").value = "";
 }
@@ -116,8 +123,12 @@ async function login(wnd) {
         return;
     }
 
-    var response = await fetch(`/api/v1/login?username=${username}&password=${password}`, {
-        method: "GET"
+    var response = await fetch("/api/v1/login", {
+        method: "POST",
+        body: JSON.stringify({
+            username,
+            password
+        })
     });
 
     switch (response.status) {
@@ -145,6 +156,10 @@ async function register(wnd) {
         createToast("注册失败：用户名为空", 3);
         return;
     }
+    if (username === "ANONYMOUS") {
+        createToast("你……你要干什么！", 3);
+        return;
+    }
     const password = wnd.querySelector("[name=register-password]").value;
     if (!password) {
         createToast("注册失败：密码为空", 3);
@@ -156,8 +171,12 @@ async function register(wnd) {
         return;
     }
 
-    var response = await fetch(`/api/v1/register?username=${username}&password=${password}`, {
-        method: "POST"
+    var response = await fetch("/api/v1/register", {
+        method: "PATCH",
+        body: JSON.stringify({
+            username,
+            password
+        })
     });
 
     switch (response.status) {
@@ -292,8 +311,12 @@ function hideAndDestroyWindow(wnd) {
 const storedUsernames = {};
 
 async function init() {
-    let response = await fetch("/api/v1/messages?limit=20&offset=0", {
-        method: "GET"
+    let response = await fetch("/api/v1/messages", {
+        method: "POST",
+        body: JSON.stringify({
+            limit: 20,
+            offset: 0
+        })
     });
 
     const json = await response.json();
@@ -313,9 +336,13 @@ async function init() {
         if (element.user in storedUsernames) {
             cloned.querySelector("[name=user]").textContent = storedUsernames[element.user];
         } else {
-            response = await fetch(`/api/v1/username?id=${element.user}`, {
-                method: "GET"
+            response = await fetch("/api/v1/username", {
+                method: "POST",
+                body: JSON.stringify({
+                    utoken: element.user
+                })
             });
+
             if (response.ok) {
                 cloned.querySelector("[name=user]").textContent = storedUsernames[element.user] = (await response.json()).name;
             }
@@ -354,8 +381,11 @@ async function init() {
         if (utoken in storedUsernames) {
             logged_username.textContent = storedUsernames[utoken];
         } else {
-            response = await fetch(`/api/v1/username?id=${utoken}`, {
-                method: "GET"
+            response = await fetch("/api/v1/username", {
+                method: "POST",
+                body: JSON.stringify({
+                    utoken
+                })
             });
             if (!response.ok) {
                 setCookie("utoken", undefined);
@@ -367,8 +397,13 @@ async function init() {
 
         //
 
-        response = await fetch(`/api/v1/user_liked_messages?utoken=${utoken}&message_id_min=0&message_id_max=20`, {
-            method: "GET"
+        response = await fetch("/api/v1/user_liked_messages", {
+            method: "POST",
+            body: JSON.stringify({
+                utoken,
+                message_id_min: 0,
+                message_id_max: 20
+            })
         });
 
         const json = await response.json();
