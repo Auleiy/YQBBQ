@@ -1,5 +1,20 @@
+import * as v1 from "./api/api_v1"
+
+const apiVersions: Record<string, any> = {
+    'v1': v1
+}
+
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        try {
+            const staticResponse = await env.ASSETS.fetch(request);
+
+            if (staticResponse.status !== 404){
+                return staticResponse;
+            }
+        }
+        catch { }
+
         const url = new URL(request.url);
         const path = url.pathname;
 
@@ -12,11 +27,9 @@ export default {
             const version = split[1];
             const method = split[2];
             
-            const modPath = `./api/api_${version}.ts`;
-            
             try
             {
-                const mod = await import(modPath);
+                const mod = apiVersions[version];
                 const mth = mod.default?.[method];
 
                 if (typeof mth !== "function") {
@@ -32,13 +45,11 @@ export default {
                 }
 
                 return await mth(request, env, ctx);
-            }
-            catch (err: any)
-            {
-                if (err.code === "MODULE_NOT_FOUND") {
+            } catch (err: any) {
+                if (err.message?.includes("No such module")) {
                     return new Response(JSON.stringify({
                         error: "API Version Not Found",
-                        message: `API Version ${version} not found.`
+                        message: `API Version ${version} not found: ${err.message}`
                     }), {
                         status: 404,
                         headers: {

@@ -3,37 +3,133 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三河市燕桥中学 非官方表白墙</title>
+    <title>燕桥表白墙</title>
     <link rel="stylesheet" href="style-main.css">
+    <script src="scripts.js"></script>
+    <script>init()</script>
   </head>
   <body>
     <div class="main-panel">
+      <div class="horizontal-layout" id="unlogged">
+        <button type="button" class="input-box width-max-content no-focus" onclick="createAndShowWindow(registerWindow)">注册</button>
+        <button type="button" class="input-box width-max-content no-focus" onclick="createAndShowWindow(loginWindow)">登录</button>
+        <span>未登录</span>
+      </div>
+      <div class="horizontal-layout" id="logged" style="display: none;">
+        <button type="button" class="input-box width-max-content no-focus" onclick="unlogin()">退出登录</button>
+        <span id="logged-username">Anonymous</span>
+      </div>
+      <span></span>
+    </div>
+    <div class="main-panel">
       <div class="header-panel">
-        <span class="header-school-name">三河市燕桥中学</span>
+        <span class="header-school-name">燕&emsp;桥</span>
         <br>
-        <span class="header-project-name">非官方表白墙</span>
+        <span class="header-project-name">表白墙</span>
       </div>
 
       <div class="group-box box">
         <div class="group-box-header">
-          <span>发表</span>
+          <span>发布</span>
         </div>
 
         <div class="grid-publish">
-          <span class="centered">发布者名称：</span>
-          <input class="input-box centered" type="text" name="publisher-name" id="publisher-name" placeholder="留空表示匿名">
-          <span>内容：</span>
-          <textarea class="input-box" name="content" id="content" rows="6"></textarea>
           <div></div>
-          <button type="submit" class="input-box no-focus">发布</button>
+          <div></div>
+          <span class="dont-align">内容：</span>
+          <textarea class="input-box content" name="content" id="content" rows="8"></textarea>
+          <span>匿名：</span>
+          <input class="input-box checkbox no-focus" type="checkbox" name="匿名" id="anonymous">
+          <div></div>
+          <button type="submit" class="input-box no-focus" onclick="publish()">发布</button>
         </div>
       </div>
 
       <div class="vertical-split"></div>
 
-      <div class="vertical-layout box">
-
+      <div class="vertical-layout box" id="message-container">
+        <template id="message-template">
+          <div class="message" data-id="0">
+            <div class="message-metadata">
+              <span name="user">Anonymous</span>
+              <span name="time">2026-2-20</span>
+            </div>
+            <span class="message-content" name="content">Hello World</span>
+            <div class="horizontal-layout buttons">
+              <div class="fore-button">
+                <i class="nf nf-cod-warning"></i>
+              </div>
+              <div class="fore-button" name="like" onclick="toggleLike(this)" data-liked="false">
+                <i class="nf nf-cod-heart" name="like-icon"></i>
+                <span name="like-count">0</span>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
+    </div>
+
+    <div class="window-container" id="window-container">
+      <template id="login-window-template">
+        <div class="window" name="login-window" style="pointer-events: none; display: none;">
+          <div class="window-content">
+            <div class="caption-bar">
+              <span class="header-school-name">登录</span>
+              <i class="nf nf-cod-close fore-button" onclick="hideAndDestroyWindow(getWindow(this))"></i>
+            </div>
+            <div class="grid-publish">
+              <span>用户名：</span>
+              <input class="input-box content" type="text" name="login-username">
+              <span>密码：</span>
+              <input class="input-box content" type="password" name="login-password">
+              <button type="submit" class="input-box no-focus" onclick="
+              if (!windows.includes(registerWindow))
+                createAndShowWindow(registerWindow)
+              hideAndDestroyWindow(getWindow(this));
+              ">注册</button>
+              <button type="submit" class="input-box no-focus" onclick="login(getWindow(this))">登录</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template id="register-window-template">
+        <div class="window" id="register-window" style="pointer-events: none; display: none;">
+          <div class="window-content">
+            <div class="caption-bar">
+              <span class="header-school-name">注册</span>
+              <i class="nf nf-cod-close fore-button" onclick="hideAndDestroyWindow(getWindow(this))"></i>
+            </div>
+            <div class="grid-publish">
+              <span>用户名：</span>
+              <input class="input-box content" type="text" name="register-username" id="register-username" placeholder="注册后不能修改哦">
+              <span>密码：</span>
+              <input class="input-box content" type="password" name="register-password" id="register-password" placeholder="任意字符！包括中文和emoji">
+              <span>确认密码：</span>
+              <input class="input-box content" type="password" name="register-confirm-password" id="register-confirm-password">
+              <button type="submit" class="input-box no-focus" onclick="
+              if (!windows.includes(loginWindow))
+                createAndShowWindow(loginWindow);
+              hideAndDestroyWindow(getWindow(this));
+              ">登录</button>
+              <button type="submit" class="input-box no-focus" onclick="register(getWindow(this))">注册</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="toast-container" id="toast-container">
+      <template id="toast-template">
+        <div class="toast">
+          <div class="content">
+            <i class="nf nf-cod-info"></i>
+            &nbsp;
+            <span name="text">Information</span>
+          </div>
+          <div class="progress-bar" style="width: 50%;" name="progress-bar"></div>
+        </div>
+      </template>
     </div>
   </body>
 </html>

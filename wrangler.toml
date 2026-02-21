@@ -2,8 +2,9 @@ name = "yqbbq"
 main = "src/index.ts"
 compatibility_date = "2026-02-20"
 
-[site]
-bucket = "./public"
+[assets]
+binding = "ASSETS"
+directory = "./public"
 
 [[d1_databases]]
 binding = "DB"
