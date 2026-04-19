@@ -13,13 +13,11 @@ export default {
 
         const folder = split[0];
 
-        if (folder === "api")
-        {
+        if (folder === "api") {
             const version = split[1];
             const method = split[2];
             
-            try
-            {
+            try {
                 const mod = apiVersions[version];
                 const mth = mod.default?.[method];
 

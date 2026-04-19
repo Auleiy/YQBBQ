@@ -1,5 +1,7 @@
 var utoken = undefined;
 
+// #region Cookie
+
 function setCookie(name, value) {
     if (value)
         document.cookie = `${name}=${value};expires=${new Date(9999, 11, 31, 23, 59, 59)}`
@@ -14,10 +16,101 @@ function getCookie(name) {
     return null;
 }
 
+// #endregion
+
+// #region User Management
+
 function unlogin() {
     setCookie("utoken", undefined);
     location.reload();
 }
+
+async function login(wnd) {
+    const username = wnd.querySelector("[name=login-username]").value;
+    if (!username) {
+        createToast("登录失败：用户名为空", 3);
+        return;
+    }
+    const password = wnd.querySelector("[name=login-password]").value;
+    if (!password) {
+        createToast("登录失败：密码为空", 3);
+        return;
+    }
+
+    var response = await fetch("/api/v1/login", {
+        method: "POST",
+        body: JSON.stringify({
+            username,
+            password
+        })
+    });
+
+    switch (response.status) {
+        case 480: // User Not Found
+            createToast("登录失败：找不到用户", 3);
+            break;
+        case 481: // Incorrect Password
+            createToast("登录失败：密码错误", 3);
+            break;
+        case 200: // Ok
+            createToast("登录成功！", 1);
+            
+            setCookie("utoken", (await response.json()).utoken);
+            
+            await sleep(1000);
+            location.reload();
+            break;
+    }
+}
+
+async function register(wnd) {
+    const username = wnd.querySelector("[name=register-username]").value;
+    if (!username) {
+        createToast("注册失败：用户名为空", 3);
+        return;
+    }
+    if (username === "ANONYMOUS") {
+        createToast("你……你要干什么！", 3);
+        return;
+    }
+    const password = wnd.querySelector("[name=register-password]").value;
+    if (!password) {
+        createToast("注册失败：密码为空", 3);
+        return;
+    }
+    const confirmPassword = wnd.querySelector("[name=register-confirm-password]").value;
+    if (password != confirmPassword) {
+        createToast("注册失败：确认密码与密码不匹配", 3);
+        return;
+    }
+
+    var response = await fetch("/api/v1/register", {
+        method: "PATCH",
+        body: JSON.stringify({
+            username,
+            password
+        })
+    });
+
+    switch (response.status) {
+        case 480: // Usename Already Exists
+            createToast("注册失败：用户名已被注册", 3);
+            break;
+        case 200: // Ok
+            createToast("注册成功！", 1);
+            
+            await sleep(1000);
+            
+            if (!windows.includes(loginWindow))
+                createAndShowWindow(loginWindow);
+            hideAndDestroyWindow(wnd);
+            break;
+    }
+}
+
+// #endregion
+
+// #region Like Management
 
 function toggleLike(element) {
     if (!utoken) {
@@ -81,6 +174,8 @@ function unlike(element) {
     element.querySelector("[name=like-icon]").classList.add("nf-cod-heart");
 }
 
+// #endregion
+
 function publish() {
     if (!utoken) {
         createAndShowWindow(loginWindow);
@@ -111,90 +206,6 @@ function getMessage(child) {
     return child.closest(".message");
 }
 
-async function login(wnd) {
-    const username = wnd.querySelector("[name=login-username]").value;
-    if (!username) {
-        createToast("登录失败：用户名为空", 3);
-        return;
-    }
-    const password = wnd.querySelector("[name=login-password]").value;
-    if (!password) {
-        createToast("登录失败：密码为空", 3);
-        return;
-    }
-
-    var response = await fetch("/api/v1/login", {
-        method: "POST",
-        body: JSON.stringify({
-            username,
-            password
-        })
-    });
-
-    switch (response.status) {
-        case 480: // User Not Found
-            createToast("登录失败：找不到用户", 3);
-            break;
-        case 481: // Incorrect Password
-            createToast("登录失败：密码错误", 3);
-            break;
-        case 200: // Ok
-            createToast("登录成功！", 1);
-            
-            setCookie("utoken", (await response.json()).utoken);
-            
-            await sleep(1000);
-            location.reload();
-            break;
-    }
-}
-
-
-async function register(wnd) {
-    const username = wnd.querySelector("[name=register-username]").value;
-    if (!username) {
-        createToast("注册失败：用户名为空", 3);
-        return;
-    }
-    if (username === "ANONYMOUS") {
-        createToast("你……你要干什么！", 3);
-        return;
-    }
-    const password = wnd.querySelector("[name=register-password]").value;
-    if (!password) {
-        createToast("注册失败：密码为空", 3);
-        return;
-    }
-    const confirmPassword = wnd.querySelector("[name=register-confirm-password]").value;
-    if (password != confirmPassword) {
-        createToast("注册失败：确认密码与密码不匹配", 3);
-        return;
-    }
-
-    var response = await fetch("/api/v1/register", {
-        method: "PATCH",
-        body: JSON.stringify({
-            username,
-            password
-        })
-    });
-
-    switch (response.status) {
-        case 480: // Usename Already Exists
-            createToast("注册失败：用户名已被注册", 3);
-            break;
-        case 200: // Ok
-            createToast("注册成功！", 1);
-            
-            await sleep(1000);
-            
-            if (!windows.includes(loginWindow))
-                createAndShowWindow(loginWindow);
-            hideAndDestroyWindow(wnd);
-            break;
-    }
-}
-
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -202,7 +213,7 @@ function sleep(ms) {
 const loginWindow = "login-window-template";
 const registerWindow = "register-window-template";
 
-// Window Manager
+// #region Window Manager
 
 const windows = [];
 const windowInstances = [];
@@ -308,7 +319,26 @@ function hideAndDestroyWindow(wnd) {
     content.addEventListener("animationend", animationEnd);
 }
 
+// #endregion
+
 const storedUsernames = {};
+
+// #region Utils
+
+function convertTime(timeStr) {
+    var time = new Date(timeStr + 'Z');
+    var now = new Date();
+    
+    var diff = Math.floor((now - time) / 1000);
+
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}天前`;
+    return time.toLocaleString();
+}
+
+//#endregion
 
 async function init() {
     let response = await fetch("/api/v1/messages", {
@@ -347,16 +377,14 @@ async function init() {
                 cloned.querySelector("[name=user]").textContent = storedUsernames[element.user] = (await response.json()).name;
             }
         }
-        cloned.querySelector("[name=time]").textContent = element.created_at;
-        cloned.querySelector("[name=content]").textContent = element.content;
+        cloned.querySelector("[name=time]").textContent = convertTime(element.created_at);
+        var content = cloned.querySelector("[name=content]");
+        content.innerHTML = element.content.replace('\n\r', '\n');
+        MathJax.Hub.Queue(["Typeset", MathJax.Hub, content]);
         cloned.querySelector("[name=like-count]").textContent = element.likes;
 
         if (i % 2 == 1) {
-            cloned.querySelectorAll(".fore-button").forEach(element => {
-                element.style.setProperty("--color-hover", "var(--color-light)");
-            });
-
-            div.style.setProperty("background-color", "color-mix(in srgb, var(--color-main), transparent 50%)");
+            div.classList.add("light");
         }
         div.dataset.id = element.id;
 

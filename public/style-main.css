@@ -1,47 +1,63 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC&display=swap');
-@import "https://www.nerdfonts.com/assets/css/webfont.css";
+
+@font-face {
+  font-family: 'Nerd Font';
+  src: url("./NF.woff2") format("woff2");
+}
 
 * {
   padding: 0;
   margin: 0;
 
-  font-family: 'Noto Sans SC';
-  font-size: 1em;
+  font-family: 'Noto Sans SC', 'Nerd Font';
+  font-size: 14pt;
 
   transition: 0.2s;
 
   box-sizing: border-box;
 
+  --text: #E0E0E0;
+
+  --bg-1: #1F1F1F;
+  --bg-2: #2F2F2F;
+  --bg-3: #3F3F3F;
+
+  --color-inactive: #5F5F5F;
+
   --color-light: #F5EFF8;
-  --color-main: #EBDEF0;
-  --color-dark: #D7BDE2;
+  --color-main: #5FAFEF;
+  --color-dark: #3F8FDF;
   --color-darker: #C39BD3;
   --color-darkest: #AF7AC5;
   --color-x-dark: #9B59B6;
-  --color-darkest-2: #5DADE2;
 
-  --color-hover: var(--color-darkest);
-  --color-active: var(--color-x-dark);
+  --color-hover: var(--color-main);
+  --color-active: var(--color-dark);
+
+  color: var(--text);
 }
 
 html {
-  background-image: url("bricks.png");
-  background-size: 128px;
-  image-rendering: pixelated;
+  background-color: var(--bg-1);
 }
 
-body {
-  padding: 1.35em;
+a.nostyle {
+  text-decoration: none;
 }
 
-div.main-panel {
-  margin: 2.7em;
-  padding: 1.35em;
-  background-color: color-mix(in srgb, var(--color-main), transparent 25%);
-  backdrop-filter: blur(0.15em);
-  border-radius: 0.65em;
+div.main {
+  margin: 1em;
+}
 
-  box-shadow: 0 0 1.35em 0.15em rgba(0, 0, 0, 0.5);
+div.top-bar {
+  background-color: var(--bg-2);
+  padding: 0.5em;
+  padding-left: 1em;
+  padding-right: 1em;
+
+  justify-content: space-between;
+  display: flex;
+  align-items: center;
 }
 
 div.header-panel {
@@ -49,30 +65,40 @@ div.header-panel {
 }
 
 div.box {
-  padding: 0.65em;
-  border: 2px solid var(--color-darker);
-  border-radius: 0.35em;
+  padding: 0.5em;
+  border: 2px solid var(--bg-3);
+  border-radius: 0.75em;
+  overflow: hidden;
 }
 
 div.group-box {
-  margin-top: 0.65em;
+  margin-top: 0.75em;
   display: flex;
   flex-wrap: wrap;
 }
 
 div.group-box-header {
   position: absolute;
-  margin-top: -18pt;
-  margin-left: 0.65em;
+  margin-top: -1.3em;
+  margin-left: 0.5em;
   font-weight: 900;
-  text-shadow: 0 0 0.15em var(--color-light), 0 0 0.15em var(--color-light), 0 0 0.15em var(--color-light), 0 0 0.15em var(--color-light);
   width: max-content;
-  padding-left: 0.65em;
-  padding-right: 0.65em;
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+  background-color: var(--bg-1);
 }
 
 span.header-school-name {
   font-size: 1.35em;
+}
+
+span.top-bar-header {
+  font-size: 2em;
+  font-weight: 900;
+
+  color: transparent;
+  background: linear-gradient(to right, var(--color-main), var(--color-darkest));
+  background-clip: text;
 }
 
 span.header-project-name {
@@ -80,7 +106,7 @@ span.header-project-name {
   font-weight: 900;
 
   color: transparent;
-  background: linear-gradient(to right, var(--color-darkest-2), var(--color-darkest));
+  background: linear-gradient(to right, var(--color-main), var(--color-darkest));
   background-clip: text;
 }
 
@@ -103,10 +129,12 @@ span.header-project-name {
 .input-box {
   background: none;
   outline: none;
-  border: 2px solid var(--color-darker);
-  background-color: color-mix(in srgb, var(--color-main), transparent 50%);
+  border: 2px solid var(--color-inactive);
+  background-color: var(--bg-2);
   padding: 0.15em;
-  border-radius: 0.35em;
+  padding-left: 0.375em;
+  padding-right: 0.375em;
+  border-radius: 0.25em;
 
   width: 100%;
 }
@@ -124,20 +152,40 @@ span.header-project-name {
   border-color: var(--color-active);
 }
 
-.input-box.checkbox {
-  appearance: none;
-
-  aspect-ratio: 1;
-  width: 1lh;
+.icon-button {
+  user-select: none;
 }
 
-.input-box.checkbox:checked {
-  background-color: var(--color-light);
-  content: "a";
-  box-shadow: 0 0 0.35em 0 rgba(0, 0, 0, 0.25);
+.icon-button:hover {
+  color: var(--color-hover);
+}
+
+.icon-button:active {
+  color: var(--color-active);
+}
+
+.input-box.checkbox {
+  appearance: none;
+  position: relative;
 
   aspect-ratio: 1;
-  width: 1lh;
+  width: 32.8px;
+}
+
+.input-box.checkbox::before {
+  position: absolute;
+  content: "\eab2";
+  color: transparent;
+  font-size: 14pt;
+  left: 3pt;
+  bottom: 2pt;
+
+  transition: inherit;
+}
+
+.input-box.checkbox:checked::before {
+  content: "\eab2";
+  color: var(--text);
 }
 
 .input-box.checkbox {
@@ -146,7 +194,11 @@ span.header-project-name {
 
 textarea.content {
   resize: vertical;
-  min-height: 8lh;
+  min-height: 4lh;
+}
+
+div.full-width {
+  width: 100%;
 }
 
 div.vertical-layout {
@@ -156,13 +208,20 @@ div.vertical-layout {
 
 div.horizontal-layout {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5em;
+}
+
+div.reversed-horizontal-layout {
+  display: flex;
   flex-direction: row-reverse;
   align-items: center;
-  gap: 0.65em;
+  gap: 0.5em;
 }
 
 div.horizontal-layout.buttons {
-  gap: 0.65em;
+  gap: 0.5em;
 }
 
 .fore-button:hover {
@@ -178,22 +237,30 @@ div.horizontal-layout.buttons {
 }
 
 div.message {
-  margin-left: -0.65em;
-  margin-right: -0.65em;
-  padding: 0.65em;
-  padding-left: 1.5em;
+  margin-left: -0.5em;
+  margin-right: -0.5em;
+  margin-bottom: -0.5em;
+  padding: 0.5em;
+  padding-bottom: 1em;
+}
+
+div.message.light {
+  background-color: var(--bg-2);
 }
 
 div.message > div.message-metadata > * {
-  margin-right: 0.65em;
-  margin-left: -0.2em;
+  margin-left: 1em;
 }
 
-div.message > span.message-content {
-  margin: 0.65em;
-  margin-left: 2em;
-  font-size: 1.35em;
+div.message > div.message-content {
+  margin: 0.5em;
+  font-size: 16pt;
   white-space: pre-line;
+  font-size: inherit;
+}
+
+div.message > div.message-content * {
+  font-size: inherit;
 }
 
 div.window {
@@ -336,3 +403,39 @@ div.toast-container > div.toast > div.progress-bar {
     transform: translateX(100%);
   }
 }
+
+/* #region User HTML Content Elements */
+center {
+  all: inherit;
+
+  display: block;
+  text-align: center;
+}
+right {
+  all: inherit;
+
+  display: block;
+  text-align: right;
+}
+sqrt {
+    display: inline-block;
+    position: relative;
+    white-space: nowrap;
+}
+
+sqrt::before {
+    content: '√';
+    font-size: 1.2em;
+    position: relative;
+    top: 0.1em;
+}
+
+sqrt::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0.8em;
+    right: 0;
+    border-top: 1px solid currentColor;
+}
+/* #endregion */

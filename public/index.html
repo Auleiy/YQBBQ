@@ -5,12 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>燕桥表白墙</title>
     <link rel="stylesheet" href="style-main.css">
+
+    <script>
+      window.MathJax = {
+        tex2jax: {
+          inlineMath: {'[+]': [['$', '$']]},
+          displayMath: {'[+]': [['$$', '$$']]}
+        }
+      };
+    </script>
+
+    <script id="MathJax-script" defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
     <script src="scripts.js"></script>
     <script>init()</script>
   </head>
   <body>
-    <div class="main-panel">
-      <div class="horizontal-layout" id="unlogged">
+    <div class="top-bar">
+      <a class="nostyle" href="/"><span class="top-bar-header">&#xeb05; 燕桥·表白墙</span></a>
+      <div class="reversed-horizontal-layout" id="unlogged">
         <button type="button" class="input-box width-max-content no-focus" onclick="createAndShowWindow(registerWindow)">注册</button>
         <button type="button" class="input-box width-max-content no-focus" onclick="createAndShowWindow(loginWindow)">登录</button>
         <span>未登录</span>
@@ -19,15 +32,8 @@
         <button type="button" class="input-box width-max-content no-focus" onclick="unlogin()">退出登录</button>
         <span id="logged-username">Anonymous</span>
       </div>
-      <span></span>
     </div>
-    <div class="main-panel">
-      <div class="header-panel">
-        <span class="header-school-name">燕&emsp;桥</span>
-        <br>
-        <span class="header-project-name">表白墙</span>
-      </div>
-
+    <div class="main">
       <div class="group-box box">
         <div class="group-box-header">
           <span>发布</span>
@@ -37,7 +43,7 @@
           <div></div>
           <div></div>
           <span class="dont-align">内容：</span>
-          <textarea class="input-box content" name="content" id="content" rows="8"></textarea>
+          <textarea class="input-box content" name="content" id="content" rows="6"></textarea>
           <span>匿名：</span>
           <input class="input-box checkbox no-focus" type="checkbox" name="匿名" id="anonymous">
           <div></div>
@@ -54,13 +60,13 @@
               <span name="user">Anonymous</span>
               <span name="time">2026-2-20</span>
             </div>
-            <span class="message-content" name="content">Hello World</span>
-            <div class="horizontal-layout buttons">
+            <div class="message-content" name="content">Hello World</div>
+            <div class="reversed-horizontal-layout buttons">
               <div class="fore-button">
-                <i class="nf nf-cod-warning"></i>
+                <span class="icon-button">&#xea6c;</span>
               </div>
               <div class="fore-button" name="like" onclick="toggleLike(this)" data-liked="false">
-                <i class="nf nf-cod-heart" name="like-icon"></i>
+                <span class="icon-button">&#xeb05;</span>
                 <span name="like-count">0</span>
               </div>
             </div>
@@ -75,7 +81,7 @@
           <div class="window-content">
             <div class="caption-bar">
               <span class="header-school-name">登录</span>
-              <i class="nf nf-cod-close fore-button" onclick="hideAndDestroyWindow(getWindow(this))"></i>
+              <span class="icon-button" onclick="hideAndDestroyWindow(getWindow(this))">&#xea76;</span>
             </div>
             <div class="grid-publish">
               <span>用户名：</span>
@@ -98,7 +104,7 @@
           <div class="window-content">
             <div class="caption-bar">
               <span class="header-school-name">注册</span>
-              <i class="nf nf-cod-close fore-button" onclick="hideAndDestroyWindow(getWindow(this))"></i>
+              <span class="icon-button" onclick="hideAndDestroyWindow(getWindow(this))">&#xea76;</span>
             </div>
             <div class="grid-publish">
               <span>用户名：</span>
