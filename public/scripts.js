@@ -177,10 +177,6 @@ async function register(wnd) {
         createToast("注册失败：用户名为空", 3, true);
         return;
     }
-    if (username === "ANONYMOUS") {
-        createToast("你……你要干什么！", 3, true);
-        return;
-    }
     const password = wnd.querySelector("[name=register-password]").value;
     if (!password) {
         createToast("注册失败：密码为空", 3, true);
@@ -311,7 +307,7 @@ async function publish() {
     if (json.messages === "Success") {
         createToast("发布成功！", 3);
         
-        insertMessage(json.uuid, content, anonymous ? "ANONYMOUS" : utoken, new Date(), 0);
+        insertMessage(json.uuid, content, utoken, new Date(), 0, anonymous);
     }
 
     document.getElementById("content").value = "";
@@ -502,7 +498,7 @@ async function loadMessage() {
     busy = true;
     const json = await response.json();
     for (const element of json.messages) {
-        await createMessage(element.uuid, element.content, element.user, element.created_at, element.likes);
+        await createMessage(element.uuid, element.content, element.user, element.created_at, element.likes, element.anonymous);
     }
     busy = false;
 
@@ -526,24 +522,25 @@ async function loadMessage() {
     MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
 }
 
-async function createMessage(uuid, content, sender, created_at, likes) {
+async function createMessage(uuid, content, sender, created_at, likes, anonymous = 0) {
     const messageTemplate = document.getElementById("message-template");
     const messageContainer = document.getElementById("message-container");
 
     const cloned = document.importNode(messageTemplate.content, true);
     const div = cloned.querySelector(".message");
 
-    if (sender === "ANONYMOUS") {
+    if (anonymous || sender === "ANONYMOUS")
         cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
-    }
+    else
+    {
+        if (sender in storedUsernames) {
+            cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
+        } else {
+            var username = await getUsername(sender);
 
-    if (sender in storedUsernames) {
-        cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
-    } else {
-        var username = await getUsername(sender);
-
-        if (response.ok) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+            if (response.ok) {
+                cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+            }
         }
     }
     cloned.querySelector("[name=time]").textContent = convertTime(created_at);
@@ -560,24 +557,26 @@ async function createMessage(uuid, content, sender, created_at, likes) {
     i++;
 }
 
-async function insertMessage(uuid, content, sender, createdAt, likes) {
+async function insertMessage(uuid, content, sender, createdAt, likes, anonymous = 0) {
     const messageTemplate = document.getElementById("message-template");
     const messageContainer = document.getElementById("message-container");
 
     const cloned = document.importNode(messageTemplate.content, true);
     const div = cloned.querySelector(".message");
 
-    if (sender === "ANONYMOUS") {
+    
+    if (anonymous || sender === "ANONYMOUS")
         cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
-    }
+    else
+    {
+        if (sender in storedUsernames) {
+            cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
+        } else {
+            var username = await getUsername(sender);
 
-    if (sender in storedUsernames) {
-        cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
-    } else {
-        var username = await getUsername(sender);
-
-        if (response.ok) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+            if (response.ok) {
+                cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+            }
         }
     }
     cloned.querySelector("[name=time]").textContent = convertTime(createdAt);

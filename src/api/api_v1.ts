@@ -71,7 +71,16 @@ export default {
                     if (!body.utoken) {
 
                         var { results } = await env.DB.prepare(
-                            "select * from Messages order by created_at desc limit ? offset ?"
+                            "select \
+                                m.uuid,\
+                                iif(m.anonymous = 1, null, m.user) as user,\
+                                m.content,\
+                                m.created_at,\
+                                m.likes,\
+                                m.anonymous\
+                            from messages m \
+                            order by m.created_at desc \
+                            limit ? offset ? "
                         )
                             .bind(limit, offset)
                             .all();
@@ -97,7 +106,17 @@ export default {
                         }
 
                         var { results } = await env.DB.prepare(
-                            "select m.*, exists(select 1 from likes l where l.message_id = m.uuid and l.user_id = ?) as liked_by_user from messages m order by m.created_at desc limit ? offset ?"
+                            "select \
+                                m.uuid,\
+                                iif(m.anonymous = 1, null, m.user) as user,\
+                                m.content,\
+                                m.created_at,\
+                                m.likes,\
+                                m.anonymous,\
+                                exists(select 1 from likes l where l.message_id = m.uuid and l.user_id = ?) as liked_by_user\
+                            from messages m \
+                            order by m.created_at desc \
+                            limit ? offset ? "
                         )
                             .bind(userUuid, limit, offset)
                             .all();
@@ -150,16 +169,10 @@ export default {
                         });
                     }
 
-                    let user = "ANONYMOUS";
-
-                    if (!body.anonymous) {
-                        user = userUuid || "ANONYMOUS";
-                    }
-
                     const uuid = crypto.randomUUID();
 
-                    await env.DB.prepare("insert into Messages (content, user, uuid) values (?, ?, ?)")
-                        .bind(content, user, uuid)
+                    await env.DB.prepare("insert into Messages (content, user, uuid, anonymous) values (?, ?, ?, ?)")
+                        .bind(content, userUuid, uuid, body.anonymous ? 1 : 0)
                         .run();
 
                     return Response.json({
