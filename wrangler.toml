@@ -10,3 +10,7 @@ directory = "./public"
 binding = "DB"
 database_name = "yqbbq"
 database_id = "477662f6-0c6d-470d-be9c-3b063ecbb14d"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "c86ecc378e2a48f7a9bcb8e0f3e55a96"

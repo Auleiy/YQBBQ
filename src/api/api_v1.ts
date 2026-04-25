@@ -7,7 +7,38 @@ const respHeadersPlaintext = {
     "Content-Type": "plaintext"
 }
 
-let keepingUserTokens: Map<string, string> = new Map();
+interface Token {
+    uuid: string,
+    latestActivated: number
+}
+
+async function addToken(env: Env, token: string, uuid: string) {
+    await env.KV.put(token, JSON.stringify({ uuid, latestActivated: new Date().getTime() } as Token));
+}
+
+async function resolveToken(env: Env, token: string): Promise<string | null> {
+    const v = await env.KV.get(token);
+    if (!v) return null;
+    var tokenKv = JSON.parse(v) as Token;
+
+    if (Date.now() - new Date(tokenKv.latestActivated).getTime() > 7 * 24 * 60 * 60 * 1000) {
+        await deleteToken(env, token);
+        return null;
+    }
+
+    await deleteToken(env, token);
+    await addToken(env, token, tokenKv.uuid);
+
+    return tokenKv.uuid;
+}
+
+async function deleteToken(env: Env, token: string): Promise<boolean> {
+    if (!(await env.KV.get(token))) {
+        return false;
+    }
+    await env.KV.delete(token);
+    return true;
+}
 
 export default {
     async messages(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -54,7 +85,7 @@ export default {
                         });
                     }
                     else {
-                        const userUuid = keepingUserTokens.get(body.utoken);
+                        const userUuid = await resolveToken(env, body.utoken);
                         if (!userUuid) {
                             return Response.json({
                                 error: "Unauthorized",
@@ -108,7 +139,7 @@ export default {
                         });
                     }
 
-                    const userUuid = keepingUserTokens.get(body.utoken);
+                    const userUuid = await resolveToken(env, body.utoken);
                     if (!userUuid) {
                         return Response.json({
                             error: "Unauthorized",
@@ -286,7 +317,7 @@ export default {
                     const offset = body.offset || 0;
                     const limit = Math.min(body.limit || 20, 60);
 
-                    const userUuid = keepingUserTokens.get(body.utoken);
+                    const userUuid = await resolveToken(env, body.utoken);
                     if (!userUuid) {
                         return Response.json({
                             error: "Unauthorized",
@@ -386,7 +417,7 @@ export default {
                         });
                     }
 
-                    const userUuid = keepingUserTokens.get(body.utoken);
+                    const userUuid = await resolveToken(env, body.utoken);
                     if (!userUuid) {
                         return Response.json({
                             error: "Unauthorized",
@@ -473,7 +504,7 @@ export default {
                         });
                     }
 
-                    const userUuid = keepingUserTokens.get(body.utoken);
+                    const userUuid = await resolveToken(env, body.utoken);
                     if (!userUuid) {
                         return Response.json({
                             error: "Unauthorized",
@@ -550,7 +581,7 @@ export default {
                     }
 
                     let trueUuid;
-                    if (!(trueUuid = keepingUserTokens.get(body.uuid)))
+                    if (!(trueUuid = await resolveToken(env, body.uuid)))
                         trueUuid = body.uuid;
 
                     const { name } = await env.DB.prepare(
@@ -664,7 +695,7 @@ export default {
                     }
 
                     var newToken = crypto.randomUUID();
-                    keepingUserTokens.set(newToken, user.uuid);
+                    await addToken(env, newToken, user.uuid);
 
                     return Response.json({
                         utoken: newToken
@@ -718,7 +749,7 @@ export default {
                         utoken: string
                     }
 
-                    if (!keepingUserTokens.delete(body.utoken)) {
+                    if (!await deleteToken(env, body.utoken)) {
                         return Response.json({
                             messages: "User token not found"
                         }, {
@@ -877,7 +908,7 @@ export default {
                     }
 
                     return Response.json({
-                        valid: keepingUserTokens.has(body.utoken)
+                        valid: await resolveToken(env, body.utoken) !== null
                     }, {
                         status: 200,
                         headers: respHeaders
