@@ -108,7 +108,7 @@ export default {
                         var { results } = await env.DB.prepare(
                             "select \
                                 m.uuid,\
-                                iif(m.anonymous = 1, null, m.user) as user,\
+                                iif(m.anonymous = 1 and m.user != ?, null, m.user) as user,\
                                 m.content,\
                                 m.created_at,\
                                 m.likes,\
@@ -118,7 +118,7 @@ export default {
                             order by m.created_at desc \
                             limit ? offset ? "
                         )
-                            .bind(userUuid, limit, offset)
+                            .bind(userUuid, userUuid, limit, offset)
                             .all();
 
                         return Response.json({
@@ -192,28 +192,113 @@ export default {
                     });
                 }
 
-            case "DELETE":
+            default:
                 return new Response(JSON.stringify(
                     {
-                        error: "Method Not Implemented", 
-                        message: request.method + " is not implemented."
+                        error: "Method Not Allowed",
+                        message: request.method + " is not allowed."
                     }), {
-                        status: 501,
-                        headers : respHeaders
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST, PATCH, DELETE"
+                    }
+                });
+        }
+    },
+
+    async delete_message(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return Response.json({
+                error: "Bad Request",
+                message: "body is null."
+            }, {
+                status: 400,
+                headers: respHeaders
+            });
+        }
+
+        console.log(rawBody);
+        switch (request.method) {
+            case "POST":
+                try {
+                    const body = rawBody as {
+                        uuid: number,
+                        utoken: string | undefined | null
+                    };
+
+                    const userUuid = await resolveToken(env, body.utoken || "");
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
+                            headers: respHeaders
+                        });
+                    }
+
+                    const { user } = await env.DB.prepare(
+                        "select user from Messages where uuid = ?"
+                    )
+                        .bind(body.uuid)
+                        .first() as { user: string };
+
+                    if (user !== userUuid) {
+                        const { is_mod } = await env.DB.prepare(
+                            "select is_mod from Users where uuid = ?"
+                        )
+                            .bind(userUuid)
+                            .first() as { is_mod: number };
+
+                        if (!is_mod) {
+                            return Response.json({
+                                error: "Forbidden",
+                                message: "You can only delete your own messages."
+                            }, {
+                                status: 403,
+                                headers: respHeaders
+                            });
+                        }
+                    }
+
+                    await env.DB.prepare(
+                        "delete from Messages where uuid = ?"
+                    )
+                        .bind(body.uuid)
+                        .run();
+
+                    return Response.json({
+                        messages: "Success"
+                    }, {
+                        status: 200,
+                        headers: respHeaders
                     });
+
+                } catch (err: any) {
+                    return Response.json({
+                        error: "Internal Server Error",
+                        message: err.message
+                    }, {
+                        status: 500,
+                        headers: respHeaders
+                    });
+                }
 
             default:
                 return new Response(JSON.stringify(
                     {
-                        error: "Method Not Allowed", 
+                        error: "Method Not Allowed",
                         message: request.method + " is not allowed."
                     }), {
-                        status: 405,
-                        headers : {
-                            ...respHeaders,
-                            "Allow": "POST, PATCH, DELETE"
-                        }
-                    });
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST, PATCH, DELETE"
+                    }
+                });
         }
     },
 
@@ -920,8 +1005,26 @@ export default {
                         utoken: string
                     }
 
+                    const userUuid = await resolveToken(env, body.utoken);
+                    if (!userUuid) {
+                        return Response.json({
+                            valid: false
+                        }, {
+                            status: 200,
+                            headers: respHeaders
+                        });
+                    }
+
+                    const { is_mod } = await env.DB.prepare(
+                        "select is_mod from Users where uuid = ?"
+                    )
+                        .bind(userUuid)
+                        .first() as { is_mod: number };
+
                     return Response.json({
-                        valid: await resolveToken(env, body.utoken) !== null
+                        valid: true,
+                        is_mod: is_mod !== 0,
+                        uuid: userUuid
                     }, {
                         status: 200,
                         headers: respHeaders

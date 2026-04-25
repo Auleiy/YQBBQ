@@ -1,4 +1,6 @@
 var utoken = undefined;
+var userUuid = undefined;
+var isMod = false;
 
 // #region Cookie
 
@@ -20,7 +22,7 @@ function getCookie(name) {
 
 // #region User Manager
 
-async function setLoginDisplay(refreshLiked = false)
+async function setLoginDisplay(refresh = false)
 {
     const messageContainer = document.getElementById("message-container");
     const unlogged = document.getElementById("unlogged");
@@ -38,9 +40,11 @@ async function setLoginDisplay(refreshLiked = false)
             createToast("登录状态已过期，请重新登录", 3);
             setCookie("utoken", undefined);
             utoken = null;
-            setLoginDisplay(refreshLiked);
+            setLoginDisplay(refresh);
             return;
         }
+        isMod = json.is_mod;
+        userUuid = json.uuid;
 
         unlogged.style.setProperty("display", "none");
         logged.style.removeProperty("display");
@@ -48,7 +52,7 @@ async function setLoginDisplay(refreshLiked = false)
         var loggedUsername = document.getElementById("logged-username");
         loggedUsername.textContent = await getUsername(utoken);
 
-        if (refreshLiked) {
+        if (refresh) {
             const response = await fetch("/api/v1/messages", {
                 method: "POST",
                 body: JSON.stringify({
@@ -66,15 +70,29 @@ async function setLoginDisplay(refreshLiked = false)
                     like_nodata(messageContainer.querySelector(`[data-id="${element.uuid}"] [name=like]`));
                 }
             }
+
+            for (const element of messageContainer.querySelectorAll(".message")) {
+                if (element.dataset.senderId === userUuid || isMod) {
+                    if (element.dataset.senderId === userUuid) {
+                        element.querySelector("[name=user]").textContent += "（你）";
+                    }
+                    element.querySelector("[name=delete]").style.removeProperty("display");
+                }
+            }
         }
     }
     else {
         unlogged.style.removeProperty("display");
         logged.style.setProperty("display", "none");
 
-        messageContainer.querySelectorAll(".message").forEach(element => {
+        for (const element of messageContainer.querySelectorAll(".message")) {
             unlike_nodata(element.querySelector("[name=like]"));
-        });
+            var user = element.querySelector("[name=user]")
+            if (user.textContent.endsWith("（你）")) {
+                user.textContent = user.textContent.slice(0, -3);
+            }
+            element.querySelector("[name=delete]").style.setProperty("display", "none");
+        }
     }
 }
 
@@ -142,7 +160,7 @@ async function getUsername(uuid) {
         response = await fetch("/api/v1/username", {
             method: "POST",
             body: JSON.stringify({
-                uuid
+                uuid: uuid
             })
         });
         return storedUsernames[uuid] = (await response.json()).name;
@@ -313,6 +331,29 @@ async function publish() {
     document.getElementById("content").value = "";
 }
 
+async function del(element) {
+    if (!utoken) {
+        createAndShowWindow(loginWindow);
+        return;
+    }
+    
+    const message = getMessage(element);
+    const uuid = message.dataset.id;
+
+    const result = await fetch("/api/v1/delete_message", {
+        method: "POST",
+        body: JSON.stringify({
+            utoken,
+            uuid
+        })
+    });
+
+    if (result.status === 200) {
+        deleteMessage(message);
+        createToast("删除成功！", 3);
+    }
+}
+
 function getMessage(child) {
     return child.closest(".message");
 }
@@ -449,6 +490,16 @@ function convertTime(timeStr) {
     return time.toLocaleString();
 }
 
+function getAllNextSiblings(element) {
+    const siblings = [];
+    let next = element.nextElementSibling;
+    while (next) {
+        siblings.push(next);
+        next = next.nextElementSibling;
+    }
+    return siblings;
+}
+
 //#endregion
 
 let observer = new IntersectionObserver((entries) => {
@@ -522,39 +573,32 @@ async function loadMessage() {
     MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
 }
 
-async function createMessage(uuid, content, sender, created_at, likes, anonymous = 0) {
+async function createMessage(uuid, content, sender, createdAt, likes, anonymous = 0) {
     const messageTemplate = document.getElementById("message-template");
     const messageContainer = document.getElementById("message-container");
 
     const cloned = document.importNode(messageTemplate.content, true);
     const div = cloned.querySelector(".message");
 
-    if (anonymous || sender === "ANONYMOUS")
-        cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
-    else
-    {
-        if (sender in storedUsernames) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
-        } else {
-            var username = await getUsername(sender);
-
-            if (response.ok) {
-                cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
-            }
-        }
-    }
-    cloned.querySelector("[name=time]").textContent = convertTime(created_at);
-    cloned.querySelector("[name=content]").innerHTML = content;
-    cloned.querySelector("[name=like-count]").textContent = likes;
+    await applyMessage(div, uuid, content, sender, createdAt, likes, anonymous);
 
     if (i % 2 == 1) {
         div.classList.add("light");
     }
-    div.dataset.id = uuid;
 
     messageContainer.insertBefore(cloned, messageContainer.querySelector(".loading"));
 
     i++;
+}
+
+async function deleteMessage(msg) {
+    const messageContainer = document.getElementById("message-container");
+
+    for (const element of getAllNextSiblings(msg)) {
+        element.classList.toggle("light");
+    }
+
+    messageContainer.removeChild(msg);
 }
 
 async function insertMessage(uuid, content, sender, createdAt, likes, anonymous = 0) {
@@ -564,32 +608,44 @@ async function insertMessage(uuid, content, sender, createdAt, likes, anonymous 
     const cloned = document.importNode(messageTemplate.content, true);
     const div = cloned.querySelector(".message");
 
-    
-    if (anonymous || sender === "ANONYMOUS")
-        cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
-    else
-    {
-        if (sender in storedUsernames) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
-        } else {
-            var username = await getUsername(sender);
-
-            if (response.ok) {
-                cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
-            }
-        }
-    }
-    cloned.querySelector("[name=time]").textContent = convertTime(createdAt);
-    cloned.querySelector("[name=content]").innerHTML = content;
-    cloned.querySelector("[name=like-count]").textContent = likes;
-
-    div.dataset.id = uuid;
+    await applyMessage(div, uuid, content, sender, createdAt, likes, anonymous);
 
     for (const element of messageContainer.querySelectorAll(".message")) {
         element.classList.toggle("light");
     }
 
     messageContainer.insertBefore(cloned, messageContainer.firstChild);
+}
+
+async function applyMessage(div, uuid, content, sender, createdAt, likes, anonymous = 0) {
+    if (anonymous || sender === "ANONYMOUS")
+        div.querySelector("[name=user]").textContent = "匿名用户";
+    else
+    {
+        if (sender in storedUsernames) {
+            div.querySelector("[name=user]").textContent = storedUsernames[sender];
+        } else {
+            var username = await getUsername(sender);
+
+            if (response.ok) {
+                div.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+            }
+        }
+    }
+
+    if (sender === userUuid || isMod) {
+        if (sender === userUuid) {
+            div.querySelector("[name=user]").textContent += "（你）";
+        }
+        div.querySelector("[name=delete]").style.removeProperty("display");
+    }
+
+    div.querySelector("[name=time]").textContent = convertTime(createdAt);
+    div.querySelector("[name=content]").innerHTML = content;
+    div.querySelector("[name=like-count]").textContent = likes;
+
+    div.dataset.senderId = sender;
+    div.dataset.id = uuid;
 }
 
 function createToast(content, duration, isError = false) {
