@@ -35,6 +35,11 @@ async function setLoginDisplay(isLogged)
         loggedUsername.textContent = await getUsername(utoken);
 
         loadUserLikes();
+
+        if (loggedUsername.textContent === "__DEBUG")
+        {
+
+        }
     }
     else
     {
@@ -251,7 +256,7 @@ function unlike(element) {
 
 // #endregion
 
-function publish() {
+async function publish() {
     if (!utoken) {
         createAndShowWindow(loginWindow);
         return;
@@ -265,7 +270,7 @@ function publish() {
 
     const anonymous = document.getElementById("anonymous").checked;
     
-    fetch("/api/v1/messages", {
+    var result = await fetch("/api/v1/messages", {
         method: "PATCH",
         body: JSON.stringify({
             utoken,
@@ -273,6 +278,13 @@ function publish() {
             anonymous
         })
     });
+
+    var j = await result.json();
+    if (j.messages === "Success") {
+        createToast("发布成功！", 3);
+        
+        const messageTemplate = document.getElementById("message-template");
+    }
 
     document.getElementById("content").value = "";
 }
@@ -428,49 +440,55 @@ async function init() {
     const messageTemplate = document.getElementById("message-template");
     const messageContainer = document.getElementById("message-container");
 
-    let i = 0;
-
     for (const element of json.messages) {
-        const cloned = document.importNode(messageTemplate.content, true);
-        const div = cloned.querySelector(".message");
-
-        if (element.user === "ANONYMOUS") {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[element.user] = "匿名用户";
-        }
-
-        if (element.user in storedUsernames) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[element.user];
-        } else {
-            response = await fetch("/api/v1/username", {
-                method: "POST",
-                body: JSON.stringify({
-                    utoken: element.user
-                })
-            });
-
-            if (response.ok) {
-                cloned.querySelector("[name=user]").textContent = storedUsernames[element.user] = (await response.json()).name;
-            }
-        }
-        cloned.querySelector("[name=time]").textContent = convertTime(element.created_at);
-        var content = cloned.querySelector("[name=content]");
-        content.innerHTML = element.content.replace('\n\r', '\n');
-        cloned.querySelector("[name=like-count]").textContent = element.likes;
-
-        if (i % 2 == 1) {
-            div.classList.add("light");
-        }
-        div.dataset.id = element.id;
-
-        messageContainer.appendChild(cloned);
-
-        i++;
+        await createMessage(element.uuid, element.content, element.user, element.created_at, element.likes);
     }
 
     utoken = getCookie("utoken");
     await setLoginDisplay(utoken);
 
     MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
+}
+
+let i = 0;
+
+async function createMessage(uuid, content, sender, created_at, likes) {
+    const messageTemplate = document.getElementById("message-template");
+    const messageContainer = document.getElementById("message-container");
+
+    const cloned = document.importNode(messageTemplate.content, true);
+    const div = cloned.querySelector(".message");
+
+    if (sender === "ANONYMOUS") {
+        cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
+    }
+
+    if (sender in storedUsernames) {
+        cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
+    } else {
+        response = await fetch("/api/v1/username", {
+            method: "POST",
+            body: JSON.stringify({
+                utoken: sender
+            })
+        });
+
+        if (response.ok) {
+            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = (await response.json()).name;
+        }
+    }
+    cloned.querySelector("[name=time]").textContent = convertTime(created_at);
+    cloned.querySelector("[name=content]").innerHTML = content;
+    cloned.querySelector("[name=like-count]").textContent = likes;
+
+    if (i % 2 == 1) {
+        div.classList.add("light");
+    }
+    div.dataset.id = uuid;
+
+    messageContainer.appendChild(cloned);
+
+    i++;
 }
 
 function createToast(content, duration, isError = false) {

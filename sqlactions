@@ -1,0 +1,7 @@
+PRAGMA foreign_keys = 0;
+CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Messages;
+DROP TABLE Messages;
+CREATE TABLE Messages (id INTEGER, user TEXT NOT NULL DEFAULT Anonymous, content TEXT NOT NULL, created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL, likes INTEGER DEFAULT (0) NOT NULL, uuid TEXT PRIMARY KEY);
+INSERT INTO Messages (id, user, content, created_at, likes) SELECT id, user, content, created_at, likes FROM sqlitestudio_temp_table;
+DROP TABLE sqlitestudio_temp_table;
+PRAGMA foreign_keys = 1;

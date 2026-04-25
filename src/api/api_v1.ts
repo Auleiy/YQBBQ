@@ -83,12 +83,15 @@ export default {
                         user = body.utoken || "ANONYMOUS";
                     }
 
-                    await env.DB.prepare("insert into Messages (content, user) values (?, ?)")
-                        .bind(content, user)
+                    const uuid = crypto.randomUUID();
+
+                    await env.DB.prepare("insert into Messages (content, user, uuid) values (?, ?, ?)")
+                        .bind(content, user, uuid)
                         .run();
 
                     return new Response(JSON.stringify({
-                        messages: "Success"
+                        messages: "Success",
+                        uuid: uuid
                     }), {
                         status: 200,
                         headers: respHeaders
