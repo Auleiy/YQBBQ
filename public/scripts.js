@@ -457,8 +457,7 @@ function convertTime(timeStr) {
 
 let observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            console.log('元素进入视口:', entry.target);
+        if (entry.isIntersecting && !busy) {
             loadMessage();
         }
     });
@@ -476,6 +475,7 @@ async function init() {
 let i = 0;
 let loaded = 0;
 const step = 20;
+let busy = false; 
 
 async function loadMessage() {
     let response;
@@ -499,10 +499,12 @@ async function loadMessage() {
             })
         });
     }
+    busy = true;
     const json = await response.json();
     for (const element of json.messages) {
         await createMessage(element.uuid, element.content, element.user, element.created_at, element.likes);
     }
+    busy = false;
 
     if (utoken) {
         const messageContainer = document.getElementById("message-container");
