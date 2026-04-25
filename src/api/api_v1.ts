@@ -223,8 +223,8 @@ export default {
                 try {
                     const body = rawBody as {
                         utoken: string,
-                        msgidMin: number
-                        msgidMax: number
+                        offset: number
+                        limit: number
                     };
 
                     const utoken = body.utoken;
@@ -238,13 +238,13 @@ export default {
                         });
                     }
 
-                    const msgid_min = body.msgidMin || 0;
-                    const msgid_max = body.msgidMax || 20;
+                    const offset = body.offset || 0;
+                    const limit = Math.min(body.limit || 20, 60);
 
                     const likedMsgs = (await env.DB.prepare(
-                        "select message_id from Likes where user_id = ? and message_id between ? and ?"
+                        "select l.message_id from Likes l inner join Messages m on l.message_id = m.id where l.user_id = ? order by m.created_at desc limit ? offset ?"
                     )
-                    .bind(utoken, msgid_min, msgid_max)
+                        .bind(utoken, limit, offset)
                     .all()).results;
 
                     if (!likedMsgs) {

@@ -18,22 +18,53 @@ function getCookie(name) {
 
 // #endregion
 
-// #region User Management
+// #region User Manager
 
-function unlogin() {
+async function setLoginDisplay(isLogged)
+{
+    const messageContainer = document.getElementById("message-container");
+    const unlogged = document.getElementById("unlogged");
+    const logged = document.getElementById("logged");
+
+    if (isLogged)
+    {
+        unlogged.style.setProperty("display", "none");
+        logged.style.removeProperty("display");
+
+        var loggedUsername = document.getElementById("logged-username");
+        loggedUsername.textContent = await getUsername(utoken);
+
+        loadUserLikes();
+    }
+    else
+    {
+        unlogged.style.removeProperty("display");
+        logged.style.setProperty("display", "none");
+
+        messageContainer.querySelectorAll(".message").forEach(element => {
+            unlike_nodata(element.querySelector("[name=like]"));
+        });
+    }
+}
+
+async function unlogin() {
     setCookie("utoken", undefined);
-    location.reload();
+
+    await setLoginDisplay(false);
+
+    createToast("已退出登录！", 3);
 }
 
 async function login(wnd) {
     const username = wnd.querySelector("[name=login-username]").value;
+
     if (!username) {
-        createToast("登录失败：用户名为空", 3);
+        createToast("登录失败：用户名为空", 3, true);
         return;
     }
     const password = wnd.querySelector("[name=login-password]").value;
     if (!password) {
-        createToast("登录失败：密码为空", 3);
+        createToast("登录失败：密码为空", 3, true);
         return;
     }
 
@@ -47,40 +78,84 @@ async function login(wnd) {
 
     switch (response.status) {
         case 480: // User Not Found
-            createToast("登录失败：找不到用户", 3);
+            createToast("登录失败：找不到用户", 3, true);
             break;
         case 481: // Incorrect Password
-            createToast("登录失败：密码错误", 3);
+            createToast("登录失败：密码错误", 3, true);
             break;
         case 200: // Ok
-            createToast("登录成功！", 1);
+            hideAndDestroyWindow(wnd);
             
-            setCookie("utoken", (await response.json()).utoken);
+            utoken = (await response.json()).utoken;
+            setCookie("utoken", utoken);
             
-            await sleep(1000);
-            location.reload();
+            await setLoginDisplay(true);
+
+            createToast("登录成功！", 3);
+
             break;
     }
+}
+
+async function getUsername(utoken) {
+    if (utoken in storedUsernames) {
+        return storedUsernames[utoken];
+    } else {
+        response = await fetch("/api/v1/username", {
+            method: "POST",
+            body: JSON.stringify({
+                utoken
+            })
+        });
+        if (!response.ok) {
+            setCookie("utoken", undefined);
+            location.reload();
+            return;
+        }
+        return storedUsernames[utoken] = (await response.json()).name;
+    }
+}
+
+async function loadUserLikes() {
+    const messageContainer = document.getElementById("message-container");
+    
+    response = await fetch("/api/v1/user_liked_messages", {
+        method: "POST",
+        body: JSON.stringify({
+            utoken,
+            offset: 0,
+            limit: 20
+        })
+    });
+
+    const json = await response.json();
+
+    json.messages.forEach(element => {
+        var id = element.message_id;
+
+        var elem = messageContainer.querySelector(`[data-id="${id}"]`);
+        like_nodata(elem.querySelector("[name=like]"));
+    });
 }
 
 async function register(wnd) {
     const username = wnd.querySelector("[name=register-username]").value;
     if (!username) {
-        createToast("注册失败：用户名为空", 3);
+        createToast("注册失败：用户名为空", 3, true);
         return;
     }
     if (username === "ANONYMOUS") {
-        createToast("你……你要干什么！", 3);
+        createToast("你……你要干什么！", 3, true);
         return;
     }
     const password = wnd.querySelector("[name=register-password]").value;
     if (!password) {
-        createToast("注册失败：密码为空", 3);
+        createToast("注册失败：密码为空", 3, true);
         return;
     }
     const confirmPassword = wnd.querySelector("[name=register-confirm-password]").value;
     if (password != confirmPassword) {
-        createToast("注册失败：确认密码与密码不匹配", 3);
+        createToast("注册失败：确认密码与密码不匹配", 3, true);
         return;
     }
 
@@ -94,7 +169,7 @@ async function register(wnd) {
 
     switch (response.status) {
         case 480: // Usename Already Exists
-            createToast("注册失败：用户名已被注册", 3);
+            createToast("注册失败：用户名已被注册", 3, true);
             break;
         case 200: // Ok
             createToast("注册成功！", 1);
@@ -142,15 +217,17 @@ function like(element) {
     like_nodata(element);
 }
 
-function like_nodata(element) {
-    if (!utoken) {
-        createAndShowWindow(loginWindow);
-        return;
-    }
+const nf_cod_heart = "\ueb05";
+const nf_cod_heart_filled = "\uec04";
 
+function like_nodata(element) {
     element.dataset.liked = "true";
-    element.querySelector("[name=like-icon]").classList.remove("nf-cod-heart");
-    element.querySelector("[name=like-icon]").classList.add("nf-cod-heart_filled");
+    element.querySelector("[name=like-icon]").textContent = nf_cod_heart_filled;
+}
+
+function unlike_nodata(element) {
+    element.dataset.liked = "false";
+    element.querySelector("[name=like-icon]").textContent = nf_cod_heart;
 }
 
 function unlike(element) {
@@ -167,11 +244,9 @@ function unlike(element) {
         })
     });
 
-    element.dataset.liked = "false";
     const count = element.querySelector("[name=like-count]");
     count.textContent = parseInt(count.textContent) - 1;
-    element.querySelector("[name=like-icon]").classList.remove("nf-cod-heart_filled");
-    element.querySelector("[name=like-icon]").classList.add("nf-cod-heart");
+    unlike_nodata(element);
 }
 
 // #endregion
@@ -380,7 +455,6 @@ async function init() {
         cloned.querySelector("[name=time]").textContent = convertTime(element.created_at);
         var content = cloned.querySelector("[name=content]");
         content.innerHTML = element.content.replace('\n\r', '\n');
-        MathJax.Hub.Queue(["Typeset", MathJax.Hub, content]);
         cloned.querySelector("[name=like-count]").textContent = element.likes;
 
         if (i % 2 == 1) {
@@ -393,59 +467,13 @@ async function init() {
         i++;
     }
 
-    var unlogged = document.getElementById("unlogged")
-    var logged = document.getElementById("logged")
-
     utoken = getCookie("utoken");
-    if (!utoken) {
-        unlogged.style.removeProperty("display");
-        logged.style.setProperty("display", "none");
-    } else {
-        logged.style.removeProperty("display");
-        unlogged.style.setProperty("display", "none");
+    await setLoginDisplay(utoken);
 
-        var logged_username = document.getElementById("logged-username");
-
-        if (utoken in storedUsernames) {
-            logged_username.textContent = storedUsernames[utoken];
-        } else {
-            response = await fetch("/api/v1/username", {
-                method: "POST",
-                body: JSON.stringify({
-                    utoken
-                })
-            });
-            if (!response.ok) {
-                setCookie("utoken", undefined);
-                location.reload();
-                return;
-            }
-            logged_username.textContent = storedUsernames[utoken] = (await response.json()).name;
-        }
-
-        //
-
-        response = await fetch("/api/v1/user_liked_messages", {
-            method: "POST",
-            body: JSON.stringify({
-                utoken,
-                message_id_min: 0,
-                message_id_max: 20
-            })
-        });
-
-        const json = await response.json();
-
-        json.messages.forEach(element => {
-            var id = element.message_id;
-
-            var elem = messageContainer.querySelector(`[data-id="${id}"]`);
-            like_nodata(elem.querySelector("[name=like]"));
-        });
-    }
+    MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
 }
 
-function createToast(content, duration) {
+function createToast(content, duration, isError = false) {
     const toastContainer = document.getElementById("toast-container");
     const toastTemplate = document.getElementById("toast-template");
 
@@ -455,21 +483,32 @@ function createToast(content, duration) {
     toast.style.setProperty("animation", "toast-in 0.25s ease-out forwards");
 
     toast.querySelector("[name=text]").textContent = content;
+    if (isError) {
+        toast.querySelector("[name=icon]").textContent = "\uea87";
+    }
+
     const progressBar = toast.querySelector("[name=progress-bar]");
 
     progressBar.style.setProperty("animation", `toast-progress-bar-finishing ${duration}s linear forwards`);
+
+    progressBar.addEventListener("animationend", progressEnd);
+
+    toastContainer.appendChild(cloned);
 
     function progressEnd() {
         progressBar.removeEventListener("animationend", progressEnd);
 
         toast.style.setProperty("animation", "toast-out 0.25s ease-in forwards");
-        toast.addEventListener("animationend", animationEnd);
+    
+        toast.addEventListener("animationstart", outAnimationStart);
     }
 
-    function animationEnd() {
+    function outAnimationStart() {
+        toast.removeEventListener("animationstart", outAnimationStart);
+        toast.addEventListener("animationend", outAnimationEnd);
+    }
+
+    function outAnimationEnd() {
         toastContainer.removeChild(toast);
     }
-
-    progressBar.addEventListener("animationend", progressEnd);
-    toastContainer.appendChild(cloned);
 }

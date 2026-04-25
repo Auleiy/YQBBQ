@@ -8,11 +8,10 @@
 * {
   padding: 0;
   margin: 0;
+}
 
-  font-family: 'Noto Sans SC', 'Nerd Font';
-  font-size: 14pt;
-
-  transition: 0.2s;
+body {
+  background-color: var(--bg-1);
 
   box-sizing: border-box;
 
@@ -37,23 +36,55 @@
   color: var(--text);
 }
 
-html {
-  background-color: var(--bg-1);
+body, input, button, select, textarea {
+  font-family: 'Noto Sans SC', 'Nerd Font';
 }
 
 a.nostyle {
   text-decoration: none;
 }
 
-div.main {
-  margin: 1em;
+@media (orientation: landscape)
+{
+  body {
+    font-size: 12pt;
+  }
+
+  div.main {
+    margin: 1em;
+  }
+
+  div.box {
+    padding: 1em;
+  }
+
+  div.group-box-header {
+    margin: -1.8em 0 0 0.5em;
+  }
+}
+
+@media (orientation: portrait)
+{
+  body {
+    font-size: 10pt;
+  }
+
+  div.main {
+    margin: 0.5em;
+  }
+
+  div.box {
+    padding: 0.5em;
+  }
+
+  div.group-box-header {
+    margin: -1.3em 0 0 0.5em;
+  }
 }
 
 div.top-bar {
   background-color: var(--bg-2);
-  padding: 0.5em;
-  padding-left: 1em;
-  padding-right: 1em;
+  padding: 0.5em 1em 0.65em 1em;
 
   justify-content: space-between;
   display: flex;
@@ -65,7 +96,6 @@ div.header-panel {
 }
 
 div.box {
-  padding: 0.5em;
   border: 2px solid var(--bg-3);
   border-radius: 0.75em;
   overflow: hidden;
@@ -79,23 +109,22 @@ div.group-box {
 
 div.group-box-header {
   position: absolute;
-  margin-top: -1.3em;
-  margin-left: 0.5em;
   font-weight: 900;
   width: max-content;
-  padding-left: 0.5em;
-  padding-right: 0.5em;
+  padding: 0 0.5em;
   background-color: var(--bg-1);
 }
 
-span.header-school-name {
-  font-size: 1.35em;
+span.header {
+  font-size: 1.25em;
 }
 
 span.top-bar-header {
   font-size: 2em;
   font-weight: 900;
+}
 
+span.header-color {
   color: transparent;
   background: linear-gradient(to right, var(--color-main), var(--color-darkest));
   background-clip: text;
@@ -114,7 +143,7 @@ span.header-project-name {
   align-self: center;
 }
 
-.grid-publish {
+.grid {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.5em;
@@ -122,21 +151,26 @@ span.header-project-name {
   width: 100%;
 }
 
+.grid > * {
+  box-sizing: border-box;
+}
+
 .dont-align {
   align-self: start;
 }
 
 .input-box {
+  color: inherit;
   background: none;
   outline: none;
   border: 2px solid var(--color-inactive);
   background-color: var(--bg-2);
-  padding: 0.15em;
-  padding-left: 0.375em;
-  padding-right: 0.375em;
+  padding: 0.15em 0.375em;
   border-radius: 0.25em;
 
   width: 100%;
+
+  transition: border-color 0.2s;
 }
 
 .width-max-content {
@@ -145,7 +179,6 @@ span.header-project-name {
 
 .input-box:hover, .input-box:focus:not(.no-focus) {
   border-color: var(--color-hover);
-  box-shadow: 0 0 0.35em 0 rgba(0, 0, 0, 0.25);
 }
 
 .input-box:active:not(.no-click) {
@@ -154,6 +187,8 @@ span.header-project-name {
 
 .icon-button {
   user-select: none;
+  
+  transition: color 0.2s;
 }
 
 .icon-button:hover {
@@ -169,7 +204,7 @@ span.header-project-name {
   position: relative;
 
   aspect-ratio: 1;
-  width: 32.8px;
+  width: 2.0875em;
 }
 
 .input-box.checkbox::before {
@@ -177,10 +212,10 @@ span.header-project-name {
   content: "\eab2";
   color: transparent;
   font-size: 14pt;
-  left: 3pt;
-  bottom: 2pt;
-
-  transition: inherit;
+  left: 2.5px;
+  bottom: 1px;
+  
+  transition: color 0.2s;
 }
 
 .input-box.checkbox:checked::before {
@@ -210,7 +245,7 @@ div.horizontal-layout {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.5em;
+  gap: 1em;
 }
 
 div.reversed-horizontal-layout {
@@ -224,24 +259,13 @@ div.horizontal-layout.buttons {
   gap: 0.5em;
 }
 
-.fore-button:hover {
-  color: var(--color-hover);
-}
-
-.fore-button:active {
-  color: var(--color-active);
-}
-
 .vertical-split {
-  height: 1.35em;
+  height: 1em;
 }
 
 div.message {
-  margin-left: -0.5em;
-  margin-right: -0.5em;
-  margin-bottom: -0.5em;
+  margin: 0 0.1em 0;
   padding: 0.5em;
-  padding-bottom: 1em;
 }
 
 div.message.light {
@@ -254,13 +278,8 @@ div.message > div.message-metadata > * {
 
 div.message > div.message-content {
   margin: 0.5em;
-  font-size: 16pt;
   white-space: pre-line;
-  font-size: inherit;
-}
-
-div.message > div.message-content * {
-  font-size: inherit;
+  font-size: unset;
 }
 
 div.window {
@@ -281,9 +300,9 @@ div.window-content {
   transform: translate(-50%, -50%);
 
   padding: 0.65em;
-  background-color: color-mix(in srgb, var(--color-dark), transparent 50%);
-  backdrop-filter: blur(0.35em);
-  border-radius: 0.35em;
+  background-color: var(--bg-2);
+  backdrop-filter: blur(0.5em);
+  border-radius: 0.5em;
 
   width: 24em;
 
@@ -293,6 +312,7 @@ div.window-content {
 div.caption-bar {
   display: flex;
   justify-content: space-between;
+  padding-bottom: 0.375em;
 }
 
 @keyframes window-show {
@@ -352,28 +372,28 @@ div.toast-container {
   bottom: 0;
 
   align-items: end;
-  gap: 0.35em;
+  gap: 0.25em;
 
-  padding-top: 0.35em;
+  padding-top: 0.25em;
 }
 
 div.toast-container > div.toast {
-  background-color: var(--color-main);
-  border: 0.15em solid var(--color-darker);
-  border-radius: 0.65em 0 0 0.65em;
-  box-shadow: 0 0 0.65em 0 rgba(0, 0, 0, 0.5);
+  background-color: var(--bg-3);
+  border: 2px solid var(--color-inactive);
+  border-radius: 0.5em 0 0 0.5em;
   pointer-events: none;
   transform: translateX(100%);
+  box-shadow: 0 0 0.5em 0 rgba(0, 0, 0, 0.5);
 }
 
 div.toast-container > div.toast > div.content {
-  padding: 0.5em 0.5em 0.5em 0.65em;
+  padding: 0.3em 0.3em 0.3em 0.6em;
 }
 
 div.toast-container > div.toast > div.progress-bar {
-  height: 0.25em;
-  background-image: linear-gradient(to right, var(--color-darkest), var(--color-dark));
-  border-radius: 0.125em;
+  height: 0.2em;
+  background-color: var(--color-active);
+  border-radius: 0.1em;
   margin-left: auto;
 }
 
@@ -417,25 +437,12 @@ right {
   display: block;
   text-align: right;
 }
-sqrt {
-    display: inline-block;
-    position: relative;
-    white-space: nowrap;
+
+small {
+  font-size: 0.8em;
 }
 
-sqrt::before {
-    content: '√';
-    font-size: 1.2em;
-    position: relative;
-    top: 0.1em;
-}
-
-sqrt::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0.8em;
-    right: 0;
-    border-top: 1px solid currentColor;
+large {
+  font-size: 1.4em;
 }
 /* #endregion */
