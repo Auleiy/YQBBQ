@@ -1,7 +1,40 @@
 PRAGMA foreign_keys = 0;
-CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Messages;
-DROP TABLE Messages;
-CREATE TABLE Messages (id INTEGER, user TEXT NOT NULL DEFAULT Anonymous, content TEXT NOT NULL, created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL, likes INTEGER DEFAULT (0) NOT NULL, uuid TEXT PRIMARY KEY);
-INSERT INTO Messages (id, user, content, created_at, likes) SELECT id, user, content, created_at, likes FROM sqlitestudio_temp_table;
+CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Users;
+DROP TABLE Users;
+CREATE TABLE Users (uuid TEXT PRIMARY KEY, id TEXT NOT NULL, name TEXT NOT NULL UNIQUE, password TEXT NOT NULL);
+INSERT INTO Users (id, name, password) SELECT id, name, password FROM sqlitestudio_temp_table;
+DROP TABLE sqlitestudio_temp_table;
+
+UPDATE Users SET uuid = id;
+
+CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Users;
+DROP TABLE Users;
+CREATE TABLE Users (uuid TEXT PRIMARY KEY NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL UNIQUE, password TEXT NOT NULL);
+INSERT INTO Users (uuid, id, name, password) SELECT uuid, id, name, password FROM sqlitestudio_temp_table;
+DROP TABLE sqlitestudio_temp_table;
+
+CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Likes;
+DROP TABLE Likes;
+CREATE TABLE Likes (user_id TEXT NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY (user_id, message_id), FOREIGN KEY (user_id) REFERENCES Users (uuid) ON DELETE CASCADE, FOREIGN KEY (message_id) REFERENCES Messages (uuid) ON DELETE CASCADE);
+INSERT INTO Likes (user_id, message_id) SELECT user_id, message_id FROM sqlitestudio_temp_table;
+DROP TABLE sqlitestudio_temp_table;
+
+CREATE TABLE sqlitestudio_temp_table AS SELECT * FROM Users;
+DROP TABLE Users;
+CREATE TABLE Users (uuid TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL UNIQUE, password TEXT NOT NULL);
+INSERT INTO Users (uuid, name, password) SELECT uuid, name, password FROM sqlitestudio_temp_table;
 DROP TABLE sqlitestudio_temp_table;
 PRAGMA foreign_keys = 1;
+
+DROP TABLE Likes;
+CREATE TABLE Likes (user_id TEXT NOT NULL, message_id TEXT NOT NULL, PRIMARY KEY (user_id, message_id), FOREIGN KEY (user_id) REFERENCES Users (uuid) ON DELETE CASCADE, FOREIGN KEY (message_id) REFERENCES Messages (uuid) ON DELETE CASCADE);
+CREATE TRIGGER like_on_delete AFTER DELETE ON Likes BEGIN UPDATE Messages 
+SET likes = (
+    SELECT COUNT(*) FROM Likes WHERE message_id = OLD.message_id
+)
+WHERE id = OLD.message_id; END;
+CREATE TRIGGER like_on_insert AFTER INSERT ON Likes BEGIN UPDATE Messages 
+SET likes = (
+    SELECT COUNT(*) FROM Likes WHERE message_id = NEW.message_id
+)
+WHERE id = NEW.message_id; END;

@@ -20,29 +20,55 @@ function getCookie(name) {
 
 // #region User Manager
 
-async function setLoginDisplay(isLogged)
+async function setLoginDisplay(refreshLiked = false)
 {
     const messageContainer = document.getElementById("message-container");
     const unlogged = document.getElementById("unlogged");
     const logged = document.getElementById("logged");
 
-    if (isLogged)
-    {
+    if (utoken) {
+        const response = await fetch("/api/v1/validate_token", {
+            method: "POST",
+            body: JSON.stringify({
+                utoken
+            })
+        });
+        const json = await response.json();
+        if (!json.valid) {
+            createToast("登录状态已过期，请重新登录", 3);
+            setCookie("utoken", undefined);
+            utoken = null;
+            setLoginDisplay(refreshLiked);
+            return;
+        }
+
         unlogged.style.setProperty("display", "none");
         logged.style.removeProperty("display");
 
         var loggedUsername = document.getElementById("logged-username");
         loggedUsername.textContent = await getUsername(utoken);
 
-        loadUserLikes();
+        if (refreshLiked) {
+            const response = await fetch("/api/v1/messages", {
+                method: "POST",
+                body: JSON.stringify({
+                    limit: 20,
+                    offset: 0,
+                    utoken
+                })
+            });
 
-        if (loggedUsername.textContent === "__DEBUG")
-        {
+            const json = await response.json();
 
+            const messageContainer = document.getElementById("message-container");
+            for (const element of json.messages) {
+                if (element.liked_by_user) {
+                    like_nodata(messageContainer.querySelector(`[data-id="${element.uuid}"] [name=like]`));
+                }
+            }
         }
     }
-    else
-    {
+    else {
         unlogged.style.removeProperty("display");
         logged.style.setProperty("display", "none");
 
@@ -53,10 +79,17 @@ async function setLoginDisplay(isLogged)
 }
 
 async function unlogin() {
+    await fetch("/api/v1/unlogin", {
+        method: "POST",
+        body: JSON.stringify({
+            utoken
+        })
+    });
+
     setCookie("utoken", undefined);
-
-    await setLoginDisplay(false);
-
+    utoken = null;
+    
+    await setLoginDisplay();
     createToast("已退出登录！", 3);
 }
 
@@ -102,22 +135,17 @@ async function login(wnd) {
     }
 }
 
-async function getUsername(utoken) {
-    if (utoken in storedUsernames) {
-        return storedUsernames[utoken];
+async function getUsername(uuid) {
+    if (uuid in storedUsernames) {
+        return storedUsernames[uuid];
     } else {
         response = await fetch("/api/v1/username", {
             method: "POST",
             body: JSON.stringify({
-                utoken
+                uuid
             })
         });
-        if (!response.ok) {
-            setCookie("utoken", undefined);
-            location.reload();
-            return;
-        }
-        return storedUsernames[utoken] = (await response.json()).name;
+        return storedUsernames[uuid] = (await response.json()).name;
     }
 }
 
@@ -213,8 +241,8 @@ function like(element) {
     fetch("/api/v1/like", {
         method: "PATCH",
         body: JSON.stringify({
-            id: getMessage(element).dataset.id,
-            utoken
+            uuid: getMessage(element).dataset.id,
+            utoken: utoken
         })
     });
     const count = element.querySelector("[name=like-count]");
@@ -244,7 +272,7 @@ function unlike(element) {
     fetch("/api/v1/unlike", {
         method: "PATCH",
         body: JSON.stringify({
-            id: getMessage(element).dataset.id,
+            uuid: getMessage(element).dataset.id,
             utoken
         })
     });
@@ -270,7 +298,7 @@ async function publish() {
 
     const anonymous = document.getElementById("anonymous").checked;
     
-    var result = await fetch("/api/v1/messages", {
+    const result = await fetch("/api/v1/messages", {
         method: "PATCH",
         body: JSON.stringify({
             utoken,
@@ -279,11 +307,11 @@ async function publish() {
         })
     });
 
-    var j = await result.json();
-    if (j.messages === "Success") {
+    const json = await result.json();
+    if (json.messages === "Success") {
         createToast("发布成功！", 3);
         
-        const messageTemplate = document.getElementById("message-template");
+        insertMessage(json.uuid, content, anonymous ? "ANONYMOUS" : utoken, new Date(), 0);
     }
 
     document.getElementById("content").value = "";
@@ -427,30 +455,74 @@ function convertTime(timeStr) {
 
 //#endregion
 
-async function init() {
-    let response = await fetch("/api/v1/messages", {
-        method: "POST",
-        body: JSON.stringify({
-            limit: 20,
-            offset: 0
-        })
+let observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            console.log('元素进入视口:', entry.target);
+            loadMessage();
+        }
     });
+}, {
+    threshold: 0.5
+});
 
+async function init() {
+    utoken = getCookie("utoken");
+    await setLoginDisplay(false);
+    const element = document.querySelector('.loading');
+    observer.observe(element);
+}
+
+let i = 0;
+let loaded = 0;
+const step = 20;
+
+async function loadMessage() {
+    let response;
+    if (utoken) {
+        response = await fetch("/api/v1/messages", {
+            method: "POST",
+            body: JSON.stringify({
+                limit: step,
+                offset: loaded,
+                utoken
+            })
+        });
+    }
+    else {
+        response = await fetch("/api/v1/messages", {
+            method: "POST",
+            body: JSON.stringify({
+                limit: step,
+                offset: loaded,
+                utoken: null
+            })
+        });
+    }
     const json = await response.json();
-    const messageTemplate = document.getElementById("message-template");
-    const messageContainer = document.getElementById("message-container");
-
     for (const element of json.messages) {
         await createMessage(element.uuid, element.content, element.user, element.created_at, element.likes);
     }
 
-    utoken = getCookie("utoken");
-    await setLoginDisplay(utoken);
+    if (utoken) {
+        const messageContainer = document.getElementById("message-container");
+        for (const element of json.messages) {
+            if (element.liked_by_user) {
+                like_nodata(messageContainer.querySelector(`[data-id="${element.uuid}"] [name=like]`));
+            }
+        }
+    }
+
+    if (!json.hasMore) {
+        const loading = document.querySelector('.loading');
+        observer.unobserve(loading);
+        loading.textContent = "没有更多了";
+        loading.style.setProperty("animation", "none");
+    }
+    loaded += step;
 
     MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
 }
-
-let i = 0;
 
 async function createMessage(uuid, content, sender, created_at, likes) {
     const messageTemplate = document.getElementById("message-template");
@@ -466,15 +538,10 @@ async function createMessage(uuid, content, sender, created_at, likes) {
     if (sender in storedUsernames) {
         cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
     } else {
-        response = await fetch("/api/v1/username", {
-            method: "POST",
-            body: JSON.stringify({
-                utoken: sender
-            })
-        });
+        var username = await getUsername(sender);
 
         if (response.ok) {
-            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = (await response.json()).name;
+            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
         }
     }
     cloned.querySelector("[name=time]").textContent = convertTime(created_at);
@@ -486,9 +553,42 @@ async function createMessage(uuid, content, sender, created_at, likes) {
     }
     div.dataset.id = uuid;
 
-    messageContainer.appendChild(cloned);
+    messageContainer.insertBefore(cloned, messageContainer.querySelector(".loading"));
 
     i++;
+}
+
+async function insertMessage(uuid, content, sender, createdAt, likes) {
+    const messageTemplate = document.getElementById("message-template");
+    const messageContainer = document.getElementById("message-container");
+
+    const cloned = document.importNode(messageTemplate.content, true);
+    const div = cloned.querySelector(".message");
+
+    if (sender === "ANONYMOUS") {
+        cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = "匿名用户";
+    }
+
+    if (sender in storedUsernames) {
+        cloned.querySelector("[name=user]").textContent = storedUsernames[sender];
+    } else {
+        var username = await getUsername(sender);
+
+        if (response.ok) {
+            cloned.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
+        }
+    }
+    cloned.querySelector("[name=time]").textContent = convertTime(createdAt);
+    cloned.querySelector("[name=content]").innerHTML = content;
+    cloned.querySelector("[name=like-count]").textContent = likes;
+
+    div.dataset.id = uuid;
+
+    for (const element of messageContainer.querySelectorAll(".message")) {
+        element.classList.toggle("light");
+    }
+
+    messageContainer.insertBefore(cloned, messageContainer.firstChild);
 }
 
 function createToast(content, duration, isError = false) {

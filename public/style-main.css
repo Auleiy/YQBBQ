@@ -446,3 +446,24 @@ large {
   font-size: 1.4em;
 }
 /* #endregion */
+
+span.loading {
+  text-align: center;
+  color: var(--color-inactive);
+  font-size: 1.25em;
+
+  animation: loading-animation 1s infinite ease-in-out;
+  height: 24pt;
+}
+
+@keyframes loading-animation {
+  0% {
+    font-size: 1.25em;
+  }
+  50% {
+    font-size: 1.5em;
+  }
+  100% {
+    font-size: 1.25em;
+  }
+}

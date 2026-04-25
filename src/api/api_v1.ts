@@ -7,15 +7,17 @@ const respHeadersPlaintext = {
     "Content-Type": "plaintext"
 }
 
+let keepingUserTokens: Map<string, string> = new Map();
+
 export default {
     async messages(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -27,32 +29,61 @@ export default {
                 try {
                     const body = rawBody as {
                         limit: number,
-                        offset: number
+                        offset: number,
+                        utoken: string | undefined | null
                     };
 
                     const limit = Math.min(body.limit || 20, 60);
                     const offset = body.offset || 0;
-
-                    var { results } = await env.DB.prepare(
-                        "select * from Messages order by created_at desc limit ? offset ?"
-                    )
-                    .bind(limit, offset)
-                    .all();
-
                     const { count } = await env.DB.prepare("select count(*) as count from Messages").first() as { count: number };
 
-                    return new Response(JSON.stringify({
-                        messages: results,
-                        hasMore: offset + results.length < count
-                    }), {
-                        status: 200,
-                        headers: respHeaders
-                    });
+                    if (!body.utoken) {
+
+                        var { results } = await env.DB.prepare(
+                            "select * from Messages order by created_at desc limit ? offset ?"
+                        )
+                            .bind(limit, offset)
+                            .all();
+
+                        return Response.json({
+                            messages: results,
+                            hasMore: offset + results.length < count
+                        }, {
+                            status: 200,
+                            headers: respHeaders
+                        });
+                    }
+                    else {
+                        const userUuid = keepingUserTokens.get(body.utoken);
+                        if (!userUuid) {
+                            return Response.json({
+                                error: "Unauthorized",
+                                message: "Invalid user token."
+                            }, {
+                                status: 401,
+                                headers: respHeaders
+                            });
+                        }
+
+                        var { results } = await env.DB.prepare(
+                            "select m.*, exists(select 1 from likes l where l.message_id = m.uuid and l.user_id = ?) as liked_by_user from messages m order by m.created_at desc limit ? offset ?"
+                        )
+                            .bind(userUuid, limit, offset)
+                            .all();
+
+                        return Response.json({
+                            messages: results,
+                            hasMore: offset + results.length < count
+                        }, {
+                            status: 200,
+                            headers: respHeaders
+                        });
+                    }
                 } catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.message
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -68,11 +99,22 @@ export default {
 
                     const content = body.content;
                     if (!content) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "content is missing."
-                        }), {
+                        }, {
                             status: 400,
+                            headers: respHeaders
+                        });
+                    }
+
+                    const userUuid = keepingUserTokens.get(body.utoken);
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
                             headers: respHeaders
                         });
                     }
@@ -80,7 +122,7 @@ export default {
                     let user = "ANONYMOUS";
 
                     if (!body.anonymous) {
-                        user = body.utoken || "ANONYMOUS";
+                        user = userUuid || "ANONYMOUS";
                     }
 
                     const uuid = crypto.randomUUID();
@@ -89,18 +131,18 @@ export default {
                         .bind(content, user, uuid)
                         .run();
 
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         messages: "Success",
                         uuid: uuid
-                    }), {
+                    }, {
                         status: 200,
                         headers: respHeaders
                     });
                 } catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.message
-                    }), {
+                    }, {
                         status: 500,
                         headers : respHeaders
                     });
@@ -135,10 +177,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -153,10 +195,10 @@ export default {
 
                     const id = body.id;
                     if (!id) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "id is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -169,25 +211,25 @@ export default {
                     .first();
 
                     if (!likesObj) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             message: "Message not found."
-                        }), {
+                        }, {
                             status: 420,
                             headers : respHeaders
                         });
                     }
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         count: (likesObj as { likes: number }).likes
-                    }), {
+                    }, {
                         status: 200,
                         headers: respHeaders
                     });
                 }
                 catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.toString()
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -212,10 +254,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -232,10 +274,10 @@ export default {
 
                     const utoken = body.utoken;
                     if (!utoken) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "utoken is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -244,32 +286,43 @@ export default {
                     const offset = body.offset || 0;
                     const limit = Math.min(body.limit || 20, 60);
 
+                    const userUuid = keepingUserTokens.get(body.utoken);
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
+                            headers: respHeaders
+                        });
+                    }
+
                     const likedMsgs = (await env.DB.prepare(
-                        "select l.message_id from Likes l inner join Messages m on l.message_id = m.id where l.user_id = ? order by m.created_at desc limit ? offset ?"
+                        "select l.message_id from Likes l inner join Messages m on l.message_id = m.uuid order by m.created_at desc limit ? offset ? where l.user_id = ? "
                     )
-                        .bind(utoken, limit, offset)
-                    .all()).results;
+                        .bind(userUuid, limit, offset)
+                        .all()).results;
 
                     if (!likedMsgs) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             message: "User not found."
-                        }), {
+                        }, {
                             status: 420,
                             headers : respHeaders
                         });
                     }
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         messages: likedMsgs
-                    }), {
+                    }, {
                         status: 200,
                         headers: respHeaders
                     });
                 }
                 catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.toString()
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -294,10 +347,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -307,16 +360,16 @@ export default {
             case "PATCH":
                 try {
                     const body = rawBody as {
-                        id: number,
+                        uuid: string,
                         utoken: string
                     };
 
-                    const id = body.id;
-                    if (!id) {
-                        return new Response(JSON.stringify({
+                    const uuid = body.uuid;
+                    if (!uuid) {
+                        return Response.json({
                             error: "Bad Request",
-                            message: "id is missing."
-                        }), {
+                            message: "uuid is missing."
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -324,19 +377,30 @@ export default {
 
                     const utoken = body.utoken;
                     if (!utoken) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "utoken is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
+                        });
+                    }
+
+                    const userUuid = keepingUserTokens.get(body.utoken);
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
+                            headers: respHeaders
                         });
                     }
 
                     await env.DB.prepare(
                         "INSERT INTO Likes (user_id, message_id) VALUES (?, ?);"
                     )
-                    .bind(utoken, id)
+                        .bind(userUuid, uuid)
                     .run();
 
                     return new Response(null, {
@@ -344,10 +408,10 @@ export default {
                         headers: respHeaders
                     });
                 } catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.message
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -372,10 +436,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -385,47 +449,56 @@ export default {
             case "PATCH":
                 try {
                     const body = rawBody as {
-                        id: number,
+                        uuid: string,
                         utoken: string
                     };
 
-                    const id = body.id;
-                    if (!id) {
-                        return new Response(JSON.stringify({
+                    if (!body.uuid) {
+                        return Response.json({
                             error: "Bad Request",
                             message: "id is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
                     }
 
-                    const utoken = body.utoken;
-                    if (!utoken) {
-                        return new Response(JSON.stringify({
+                    if (!body.utoken) {
+                        return Response.json({
                             error: "Bad Request",
                             message: "utoken is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
+                        });
+                    }
+
+                    const userUuid = keepingUserTokens.get(body.utoken);
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
+                            headers: respHeaders
                         });
                     }
 
                     await env.DB.prepare(
                         "DELETE FROM Likes WHERE user_id = ? AND message_id = ?;"
                     )
-                    .bind(utoken, id)
-                    .run();
+                        .bind(userUuid, body.uuid)
+                        .run();
 
                     return new Response(null, {
                         status: 200,
                         headers: respHeaders
                     });
                 } catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.message
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -450,10 +523,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -463,46 +536,49 @@ export default {
             case "POST":
                 try {
                     const body = rawBody as {
-                        utoken: number,
+                        uuid: string,
                     };
 
-                    const utoken = body.utoken;
-                    if (!utoken) {
-                        return new Response(JSON.stringify({
+                    if (!body.uuid) {
+                        return Response.json({
                             error: "Bad Request",
-                            message: "utoken is missing."
-                        }), {
+                            message: "uuid is missing."
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
                     }
 
+                    let trueUuid;
+                    if (!(trueUuid = keepingUserTokens.get(body.uuid)))
+                        trueUuid = body.uuid;
+
                     const { name } = await env.DB.prepare(
-                        "select name from Users where id = ?"
+                        "select name from Users where uuid = ?"
                     )
-                    .bind(utoken)
-                    .first() as { name: string };
+                        .bind(trueUuid)
+                        .first() as { name: string };
 
                     if (!name) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             message: "User not found."
-                        }), {
+                        }, {
                             status: 420,
                             headers: respHeaders
                         });
                     }
 
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         name: name
-                    }), {
+                    }, {
                         status: 200,
                         headers: respHeaders
                     });
                 } catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.message
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -527,10 +603,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -546,10 +622,10 @@ export default {
 
                     const inputUsername = body.username;
                     if (!inputUsername) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "username is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -557,20 +633,20 @@ export default {
 
                     const inputPassword = body.password;
                     if (!inputPassword) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "password is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
                     }
 
                     const user = (await env.DB.prepare(
-                        "select id, password from Users where name = ?"
+                        "select uuid, password from Users where name = ?"
                     )
                     .bind(inputUsername)
-                    .first()) as { id: string, password: string };
+                        .first()) as { uuid: string, password: string };
 
                     if (!user) {
                         return new Response("User Not Found", {
@@ -586,36 +662,100 @@ export default {
                             headers: respHeadersPlaintext
                         });
                     }
-                    
-                    return new Response(JSON.stringify({
-                        utoken: user.id
-                    }), {
+
+                    var newToken = crypto.randomUUID();
+                    keepingUserTokens.set(newToken, user.uuid);
+
+                    return Response.json({
+                        utoken: newToken
+                    }, {
                         status: 200,
                         headers: respHeaders
                     });
                 }
                 catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.toString()
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
                 }
-            
+
             default:
                 return new Response(JSON.stringify(
                     {
-                        error: "Method Not Allowed", 
+                        error: "Method Not Allowed",
                         message: request.method + " is not allowed."
                     }), {
-                        status: 405,
-                        headers : {
-                            ...respHeaders,
-                            "Allow": "POST"
-                        }
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST"
+                    }
+                });
+        }
+    },
+
+    async unlogin(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return Response.json({
+                error: "Bad Request",
+                message: "body is null."
+            }, {
+                status: 400,
+                headers: respHeaders
+            });
+        }
+
+        switch (request.method) {
+            case "POST":
+                try {
+                    const body = rawBody as {
+                        utoken: string
+                    }
+
+                    if (!keepingUserTokens.delete(body.utoken)) {
+                        return Response.json({
+                            messages: "User token not found"
+                        }, {
+                            status: 404,
+                            headers: respHeaders
+                        });
+                    }
+
+                    return Response.json({
+                        messages: "Success"
+                    }, {
+                        status: 200,
+                        headers: respHeaders
                     });
+                }
+                catch (err: any) {
+                    return Response.json({
+                        error: "Internal Server Error",
+                        message: err.toString()
+                    }, {
+                        status: 500,
+                        headers: respHeaders
+                    });
+                }
+
+            default:
+                return new Response(JSON.stringify(
+                    {
+                        error: "Method Not Allowed",
+                        message: request.method + " is not allowed."
+                    }), {
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST"
+                    }
+                });
         }
     },
 
@@ -623,10 +763,10 @@ export default {
         const rawBody = await request.json();
 
         if (!rawBody) {
-            return new Response(JSON.stringify({
+            return Response.json({
                 error: "Bad Request",
                 message: "body is null."
-            }), {
+            }, {
                 status: 400,
                 headers: respHeaders
             });
@@ -642,10 +782,10 @@ export default {
 
                     const inputUsername = body.username;
                     if (!inputUsername) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "username is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -658,19 +798,19 @@ export default {
                     .first());
 
                     if (existence) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Username Already Exists",
-                        }), {
+                        }, {
                             status: 480
                         });
                     }
 
                     const inputPassword = body.password;
                     if (!inputPassword) {
-                        return new Response(JSON.stringify({
+                        return Response.json({
                             error: "Bad Request",
                             message: "password is missing."
-                        }), {
+                        }, {
                             status: 400,
                             headers : respHeaders
                         });
@@ -681,7 +821,7 @@ export default {
                     const uuid = crypto.randomUUID();
 
                     await env.DB.prepare(
-                        "insert into Users (id, name, password) values (?, ?, ?)"
+                        "insert into Users (uuid, name, password) values (?, ?, ?)"
                     )
                     .bind(uuid, inputUsername, passwordHash)
                     .run();
@@ -692,10 +832,10 @@ export default {
                     });
                 }
                 catch (err: any) {
-                    return new Response(JSON.stringify({
+                    return Response.json({
                         error: "Internal Server Error",
                         message: err.toString()
-                    }), {
+                    }, {
                         status: 500,
                         headers: respHeaders
                     });
@@ -713,6 +853,58 @@ export default {
                             "Allow": "PATCH"
                         }
                     });
+        }
+    },
+
+    async validate_token(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return Response.json({
+                error: "Bad Request",
+                message: "body is null."
+            }, {
+                status: 400,
+                headers: respHeaders
+            });
+        }
+
+        switch (request.method) {
+            case "POST":
+                try {
+                    const body = rawBody as {
+                        utoken: string
+                    }
+
+                    return Response.json({
+                        valid: keepingUserTokens.has(body.utoken)
+                    }, {
+                        status: 200,
+                        headers: respHeaders
+                    });
+                }
+                catch (err: any) {
+                    return Response.json({
+                        error: "Internal Server Error",
+                        message: err.toString()
+                    }, {
+                        status: 500,
+                        headers: respHeaders
+                    });
+                }
+
+            default:
+                return new Response(JSON.stringify(
+                    {
+                        error: "Method Not Allowed",
+                        message: request.method + " is not allowed."
+                    }), {
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST"
+                    }
+                });
         }
     }
 }
