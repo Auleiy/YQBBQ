@@ -467,3 +467,8 @@ span.loading {
     font-size: 1.25em;
   }
 }
+
+.debug {
+  color: var(--color-inactive);
+  display: none;
+}

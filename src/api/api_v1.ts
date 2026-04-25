@@ -40,6 +40,16 @@ async function deleteToken(env: Env, token: string): Promise<boolean> {
     return true;
 }
 
+async function isMod(env: Env, uuid: string): Promise<boolean> {
+    const { is_mod } = await env.DB.prepare(
+        "select is_mod from Users where uuid = ?"
+    )
+        .bind(uuid)
+        .first() as { is_mod: number };
+
+    return is_mod !== 0;
+}
+
 export default {
     async messages(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const rawBody = await request.json();
@@ -69,7 +79,6 @@ export default {
                     const { count } = await env.DB.prepare("select count(*) as count from Messages").first() as { count: number };
 
                     if (!body.utoken) {
-
                         var { results } = await env.DB.prepare(
                             "select \
                                 m.uuid,\
@@ -96,16 +105,50 @@ export default {
                     else {
                         const userUuid = await resolveToken(env, body.utoken);
                         if (!userUuid) {
+                            const { results } = await env.DB.prepare(
+                                "select \
+                                    m.uuid,\
+                                    iif(m.anonymous = 1, null, m.user) as user,\
+                                    m.content,\
+                                    m.created_at,\
+                                    m.likes,\
+                                    m.anonymous\
+                                from messages m \
+                                order by m.created_at desc \
+                                limit ? offset ? "
+                            )
+                                .bind(limit, offset)
+                                .all();
+
                             return Response.json({
-                                error: "Unauthorized",
-                                message: "Invalid user token."
+                                messages: results,
+                                hasMore: offset + results.length < count
                             }, {
-                                status: 401,
+                                status: 200,
                                 headers: respHeaders
                             });
                         }
 
-                        var { results } = await env.DB.prepare(
+                        if (await isMod(env, userUuid)) {
+                            const { results } = await env.DB.prepare(
+                                "select *\
+                                from Messages \
+                                order by created_at desc \
+                                limit ? offset ? "
+                            )
+                                .bind(limit, offset)
+                                .all();
+
+                            return Response.json({
+                                messages: results,
+                                hasMore: offset + results.length < count
+                            }, {
+                                status: 200,
+                                headers: respHeaders
+                            });
+                        }
+
+                        const { results } = await env.DB.prepare(
                             "select \
                                 m.uuid,\
                                 iif(m.anonymous = 1 and m.user != ?, null, m.user) as user,\
@@ -247,11 +290,7 @@ export default {
                         .first() as { user: string };
 
                     if (user !== userUuid) {
-                        const { is_mod } = await env.DB.prepare(
-                            "select is_mod from Users where uuid = ?"
-                        )
-                            .bind(userUuid)
-                            .first() as { is_mod: number };
+                        const is_mod = isMod(env, userUuid);
 
                         if (!is_mod) {
                             return Response.json({
@@ -1015,15 +1054,11 @@ export default {
                         });
                     }
 
-                    const { is_mod } = await env.DB.prepare(
-                        "select is_mod from Users where uuid = ?"
-                    )
-                        .bind(userUuid)
-                        .first() as { is_mod: number };
+                    const is_mod = isMod(env, userUuid);
 
                     return Response.json({
                         valid: true,
-                        is_mod: is_mod !== 0,
+                        is_mod,
                         uuid: userUuid
                     }, {
                         status: 200,

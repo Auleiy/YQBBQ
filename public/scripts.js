@@ -154,6 +154,8 @@ async function login(wnd) {
 }
 
 async function getUsername(uuid) {
+    if (uuid === "ANONYMOUS")
+        return "匿名用户";
     if (uuid in storedUsernames) {
         return storedUsernames[uuid];
     } else {
@@ -618,19 +620,10 @@ async function insertMessage(uuid, content, sender, createdAt, likes, anonymous 
 }
 
 async function applyMessage(div, uuid, content, sender, createdAt, likes, anonymous = 0) {
-    if (anonymous || sender === "ANONYMOUS")
+    if (anonymous) {
         div.querySelector("[name=user]").textContent = "匿名用户";
-    else
-    {
-        if (sender in storedUsernames) {
-            div.querySelector("[name=user]").textContent = storedUsernames[sender];
-        } else {
-            var username = await getUsername(sender);
-
-            if (response.ok) {
-                div.querySelector("[name=user]").textContent = storedUsernames[sender] = username;
-            }
-        }
+    } else {
+        div.querySelector("[name=user]").textContent = await getUsername(sender);
     }
 
     if (sender === userUuid || isMod) {
@@ -643,6 +636,15 @@ async function applyMessage(div, uuid, content, sender, createdAt, likes, anonym
     div.querySelector("[name=time]").textContent = convertTime(createdAt);
     div.querySelector("[name=content]").innerHTML = content;
     div.querySelector("[name=like-count]").textContent = likes;
+
+    if (isMod) {
+        div.querySelector("[name=id]").textContent = uuid;
+        div.querySelector("[name=sender-id]").textContent = sender;
+        div.querySelector("[name=sender-name]").textContent = await getUsername(sender);
+        div.querySelectorAll(".debug").forEach(element => {
+            element.style.setProperty("display", "inline-block");
+        });
+    }
 
     div.dataset.senderId = sender;
     div.dataset.id = uuid;
