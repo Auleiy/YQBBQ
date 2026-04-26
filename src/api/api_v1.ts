@@ -121,12 +121,19 @@ export default {
 
                     async function loggedInMod(userUuid: string): Promise<Record<string, any>[]> {
                         const { results } = await env.DB.prepare(
-                            "select *\
-                                from Messages \
-                                order by created_at desc \
-                                limit ? offset ? "
+                            "select \
+                                m.uuid,\
+                                m.user,\
+                                m.content,\
+                                m.created_at,\
+                                m.likes,\
+                                m.anonymous,\
+                                exists(select 1 from likes l where l.message_id = m.uuid and l.user_id = ?) as liked_by_user\
+                            from messages m \
+                            order by m.created_at desc \
+                            limit ? offset ? "
                         )
-                            .bind(limit, offset)
+                            .bind(userUuid, limit, offset)
                             .all();
 
                         return results;
@@ -134,12 +141,12 @@ export default {
 
                     var results;
 
-                    if (!body.utoken) { // NOT LOGGED IN
+                    if (!body.utoken) {
                         results = await notLoggedIn();
                     }
                     else {
                         const userUuid = await resolveToken(env, body.utoken);
-                        if (!userUuid) { // INVALID TOKEN, TREAT AS NOT LOGGED IN
+                        if (!userUuid) {
                             results = await notLoggedIn();
                         }
                         else if (await isMod(env, userUuid)) {
