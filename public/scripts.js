@@ -356,6 +356,40 @@ async function del(element) {
     }
 }
 
+var confirmed = false;
+
+async function mod_deleteUser(element) {
+    if (!utoken) {
+        createAndShowWindow(loginWindow);
+        return;
+    }
+    
+    confirmed = !confirmed;
+    if (confirmed) {
+        createToast("删除用户为危险操作，请再点击一次以删除", 3);
+        return;
+    }
+    
+    const message = getMessage(element);
+    const senderId = message.dataset.senderId;
+    
+    const result = await fetch("/api/v1/delete_user", {
+        method: "POST",
+        body: JSON.stringify({
+            utoken,
+            uuid: senderId
+        })
+    });
+
+    if (result.status === 200) {
+        const messages = document.querySelectorAll(`[data-sender-id="${senderId}"]`);
+        messages.forEach(message => {
+            deleteMessage(message);
+        });
+        createToast("删除用户成功！", 3);
+    }
+}
+
 function getMessage(child) {
     return child.closest(".message");
 }
@@ -640,7 +674,7 @@ async function applyMessage(div, uuid, content, sender, createdAt, likes, anonym
     if (isMod) {
         div.querySelector("[name=id]").textContent = uuid;
         div.querySelector("[name=sender-id]").textContent = sender;
-        div.querySelector("[name=sender-name]").textContent = await getUsername(sender);
+        div.querySelector("[name=sender-name]").textContent = `（${await getUsername(sender)}）`;
         div.querySelectorAll(".debug").forEach(element => {
             element.style.setProperty("display", "inline-block");
         });

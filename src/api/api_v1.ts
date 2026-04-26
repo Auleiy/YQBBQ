@@ -237,7 +237,7 @@ export default {
                     status: 405,
                     headers: {
                         ...respHeaders,
-                        "Allow": "POST, PATCH, DELETE"
+                        "Allow": "POST, PATCH"
                     }
                 });
         }
@@ -261,7 +261,7 @@ export default {
             case "POST":
                 try {
                     const body = rawBody as {
-                        uuid: number,
+                        uuid: string,
                         utoken: string | undefined | null
                     };
 
@@ -328,7 +328,7 @@ export default {
                     status: 405,
                     headers: {
                         ...respHeaders,
-                        "Allow": "POST, PATCH, DELETE"
+                        "Allow": "POST"
                     }
                 });
         }
@@ -757,6 +757,94 @@ export default {
                             "Allow": "POST"
                         }
                     });
+        }
+    },
+
+    async delete_user(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        const rawBody = await request.json();
+
+        if (!rawBody) {
+            return Response.json({
+                error: "Bad Request",
+                message: "body is null."
+            }, {
+                status: 400,
+                headers: respHeaders
+            });
+        }
+
+        switch (request.method) {
+            case "POST":
+                try {
+                    const body = rawBody as {
+                        uuid: string,
+                        utoken: string | undefined | null
+                    };
+
+                    const userUuid = await resolveToken(env, body.utoken || "");
+                    if (!userUuid) {
+                        return Response.json({
+                            error: "Unauthorized",
+                            message: "Invalid user token."
+                        }, {
+                            status: 401,
+                            headers: respHeaders
+                        });
+                    }
+
+                    const is_mod = isMod(env, userUuid);
+
+                    if (!is_mod) {
+                        return Response.json({
+                            error: "Forbidden",
+                            message: "Only moderators can delete users."
+                        }, {
+                            status: 403,
+                            headers: respHeaders
+                        });
+                    }
+
+                    await env.DB.prepare(
+                        "delete from Users where uuid = ?"
+                    )
+                        .bind(body.uuid)
+                        .run();
+
+                    await env.DB.prepare(
+                        "delete from Messages where user = ?"
+                    )
+                        .bind(body.uuid)
+                        .run();
+
+                    return Response.json({
+                        messages: "Success"
+                    }, {
+                        status: 200,
+                        headers: respHeaders
+                    });
+                }
+                catch (err: any) {
+                    return Response.json({
+                        error: "Internal Server Error",
+                        message: err.toString()
+                    }, {
+                        status: 500,
+                        headers: respHeaders
+                    });
+                }
+
+            default:
+                return new Response(JSON.stringify(
+                    {
+                        error: "Method Not Allowed",
+                        message: request.method + " is not allowed."
+                    }), {
+                    status: 405,
+                    headers: {
+                        ...respHeaders,
+                        "Allow": "POST"
+                    }
+                });
         }
     },
 
