@@ -21,13 +21,15 @@ async function resolveToken(env: Env, token: string): Promise<string | null> {
     if (!v) return null;
     var tokenKv = JSON.parse(v) as Token;
 
-    if (Date.now() - new Date(tokenKv.latestActivated).getTime() > 7 * 24 * 60 * 60 * 1000) {
+    var delta = Date.now() - new Date(tokenKv.latestActivated).getTime();
+
+    if (delta > 7 * 24 * 60 * 60 * 1000) {
         await deleteToken(env, token);
         return null;
     }
-
-    await deleteToken(env, token);
-    await addToken(env, token, tokenKv.uuid);
+    if (delta > 24 * 60 * 60 * 1000) {
+        await addToken(env, token, tokenKv.uuid);
+    }
 
     return tokenKv.uuid;
 }
