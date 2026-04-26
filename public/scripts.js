@@ -165,7 +165,12 @@ async function getUsername(uuid) {
                 uuid: uuid
             })
         });
-        return storedUsernames[uuid] = (await response.json()).name;
+        const json = await response.json();
+        var name = json.name;
+        if (json.is_mod) {
+            name = "[管理员] " + name;
+        }
+        return storedUsernames[uuid] = name;
     }
 }
 
@@ -353,6 +358,40 @@ async function del(element) {
     if (result.status === 200) {
         deleteMessage(message);
         createToast("删除成功！", 3);
+    }
+}
+
+var confirmed = false;
+
+async function mod_deleteUser(element) {
+    if (!utoken) {
+        createAndShowWindow(loginWindow);
+        return;
+    }
+    
+    confirmed = !confirmed;
+    if (confirmed) {
+        createToast("删除用户为危险操作，请再点击一次以删除", 3);
+        return;
+    }
+    
+    const message = getMessage(element);
+    const senderId = message.dataset.senderId;
+    
+    const result = await fetch("/api/v1/delete_user", {
+        method: "POST",
+        body: JSON.stringify({
+            utoken,
+            uuid: senderId
+        })
+    });
+
+    if (result.status === 200) {
+        const messages = document.querySelectorAll(`[data-sender-id="${senderId}"]`);
+        messages.forEach(message => {
+            deleteMessage(message);
+        });
+        createToast("删除用户成功！", 3);
     }
 }
 
@@ -640,7 +679,7 @@ async function applyMessage(div, uuid, content, sender, createdAt, likes, anonym
     if (isMod) {
         div.querySelector("[name=id]").textContent = uuid;
         div.querySelector("[name=sender-id]").textContent = sender;
-        div.querySelector("[name=sender-name]").textContent = await getUsername(sender);
+        div.querySelector("[name=sender-name]").textContent = `（${await getUsername(sender)}）`;
         div.querySelectorAll(".debug").forEach(element => {
             element.style.setProperty("display", "inline-block");
         });
