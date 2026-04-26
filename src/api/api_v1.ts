@@ -80,8 +80,8 @@ export default {
                     const offset = body.offset || 0;
                     const { count } = await env.DB.prepare("select count(*) as count from Messages").first() as { count: number };
 
-                    if (!body.utoken) {
-                        var { results } = await env.DB.prepare(
+                    async function notLoggedIn(): Promise<Record<string, any>[]> {
+                        const { results } = await env.DB.prepare(
                             "select \
                                 m.uuid,\
                                 iif(m.anonymous = 1, null, m.user) as user,\
@@ -96,60 +96,10 @@ export default {
                             .bind(limit, offset)
                             .all();
 
-                        return Response.json({
-                            messages: results,
-                            hasMore: offset + results.length < count
-                        }, {
-                            status: 200,
-                            headers: respHeaders
-                        });
+                        return results;
                     }
-                    else {
-                        const userUuid = await resolveToken(env, body.utoken);
-                        if (!userUuid) {
-                            const { results } = await env.DB.prepare(
-                                "select \
-                                    m.uuid,\
-                                    iif(m.anonymous = 1, null, m.user) as user,\
-                                    m.content,\
-                                    m.created_at,\
-                                    m.likes,\
-                                    m.anonymous\
-                                from messages m \
-                                order by m.created_at desc \
-                                limit ? offset ? "
-                            )
-                                .bind(limit, offset)
-                                .all();
 
-                            return Response.json({
-                                messages: results,
-                                hasMore: offset + results.length < count
-                            }, {
-                                status: 200,
-                                headers: respHeaders
-                            });
-                        }
-
-                        if (await isMod(env, userUuid)) {
-                            const { results } = await env.DB.prepare(
-                                "select *\
-                                from Messages \
-                                order by created_at desc \
-                                limit ? offset ? "
-                            )
-                                .bind(limit, offset)
-                                .all();
-
-                            return Response.json({
-                                messages: results,
-                                hasMore: offset + results.length < count
-                            }, {
-                                status: 200,
-                                headers: respHeaders
-                            });
-                        }
-
+                    async function loggedIn(userUuid: string): Promise<Record<string, any>[]> {
                         const { results } = await env.DB.prepare(
                             "select \
                                 m.uuid,\
@@ -166,14 +116,55 @@ export default {
                             .bind(userUuid, userUuid, limit, offset)
                             .all();
 
-                        return Response.json({
-                            messages: results,
-                            hasMore: offset + results.length < count
-                        }, {
-                            status: 200,
-                            headers: respHeaders
-                        });
+                        return results;
                     }
+
+                    async function loggedInMod(userUuid: string): Promise<Record<string, any>[]> {
+                        const { results } = await env.DB.prepare(
+                            "select \
+                                m.uuid,\
+                                m.user,\
+                                m.content,\
+                                m.created_at,\
+                                m.likes,\
+                                m.anonymous,\
+                                exists(select 1 from likes l where l.message_id = m.uuid and l.user_id = ?) as liked_by_user\
+                            from messages m \
+                            order by m.created_at desc \
+                            limit ? offset ? "
+                        )
+                            .bind(userUuid, limit, offset)
+                            .all();
+
+                        return results;
+                    }
+
+                    var results;
+
+                    if (!body.utoken) {
+                        results = await notLoggedIn();
+                    }
+                    else {
+                        const userUuid = await resolveToken(env, body.utoken);
+                        if (!userUuid) {
+                            results = await notLoggedIn();
+                        }
+                        else if (await isMod(env, userUuid)) {
+                            results = await loggedInMod(userUuid);
+                        }
+                        else {
+                            results = await loggedIn(userUuid);
+                        }
+                    }
+
+                    return Response.json({
+                        messages: results,
+                        hasMore: offset + results.length < count
+                    }, {
+                        status: 200,
+                        headers: respHeaders
+                    });
+
                 } catch (err: any) {
                     return Response.json({
                         error: "Internal Server Error",
