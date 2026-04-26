@@ -283,7 +283,7 @@ export default {
                         .first() as { user: string };
 
                     if (user !== userUuid) {
-                        const is_mod = isMod(env, userUuid);
+                        const is_mod = await isMod(env, userUuid);
 
                         if (!is_mod) {
                             return Response.json({
@@ -729,8 +729,11 @@ export default {
                         });
                     }
 
+                    const is_mod = await isMod(env, trueUuid);
+
                     return Response.json({
-                        name: name
+                        name,
+                        is_mod
                     }, {
                         status: 200,
                         headers: respHeaders
@@ -792,7 +795,7 @@ export default {
                         });
                     }
 
-                    const is_mod = isMod(env, userUuid);
+                    const is_mod = await isMod(env, userUuid);
 
                     if (!is_mod) {
                         return Response.json({
@@ -1135,7 +1138,7 @@ export default {
                         });
                     }
 
-                    const is_mod = isMod(env, userUuid);
+                    const is_mod = await isMod(env, userUuid);
 
                     return Response.json({
                         valid: true,

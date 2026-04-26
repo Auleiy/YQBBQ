@@ -165,7 +165,12 @@ async function getUsername(uuid) {
                 uuid: uuid
             })
         });
-        return storedUsernames[uuid] = (await response.json()).name;
+        const json = await response.json();
+        var name = json.name;
+        if (json.is_mod) {
+            name = "[管理员] " + name;
+        }
+        return storedUsernames[uuid] = name;
     }
 }
 
