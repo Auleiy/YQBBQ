@@ -282,6 +282,11 @@ div.message > div.message-content {
   font-size: unset;
 }
 
+div.message > div.message-content > img {
+  max-width: 100%;
+  display: inline-block;
+}
+
 div.window {
   background-color: rgba(0, 0, 0, 0.25);
   position: fixed;
